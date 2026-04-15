@@ -12,6 +12,7 @@ interface ChunkResult {
 }
 
 /**
+ * 
  * Search for relevant content chunks using vector similarity
  *
  * How it works:
@@ -29,7 +30,7 @@ export async function searchRelevantChunks(
   topK: number = 5,
 ): Promise<ChunkResult[]> {
   try {
-    // Step 1: Convert user's question to embedding
+    // Step 1: Convert user's question to embedding vector
     const queryEmbedding = await getEmbedding(query);
 
     // Step 2: Fetch all embedded content for this user
