@@ -28,26 +28,21 @@ const connectToDatabase = async () => {
 connectToDatabase();
 app.use(express.json());
 
-// ============= AUTHENTICATION =============
 app.post("/api/v1/signin", signin);
 app.post("/api/v1/signup", signup);
 
-// ============= CONTENT MANAGEMENT =============
 app.post("/api/v1/content", userMiddleware, addContent);
 app.get("/api/v1/content", userMiddleware, getContent);
 app.delete("/api/v1/content", userMiddleware, deleteContent);
 
-// ============= TEXT EXTRACTION (NEW) =============
 // Extract text from a single piece of content
 app.post("/api/v1/brain/extract", userMiddleware, extractContent);
 
 // Extract text from ALL user's pending content
 app.post("/api/v1/brain/extract-all", userMiddleware, extractAllContent);
 
-// ============= SHARE LINK MANAGEMENT =============
 app.post("/api/v1/brain/share", userMiddleware, genrateLink);
 
-// ============= PUBLIC BRAIN VIEWING =============
 app.get("/api/v1/brain/:shareLink", async (req, res) => {
   const hash = req.params.shareLink;
 
