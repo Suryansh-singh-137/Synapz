@@ -53,13 +53,87 @@ const tagSchema = new mongoose_1.Schema({
         unique: true,
     },
 });
-const contentTypes = ["image", "video", "article", "audio"];
-const contentSchema = new mongoose_1.Schema({
-    link: { type: String, required: true },
-    type: { type: String, enum: contentTypes, required: true },
-    title: { type: String, required: true },
-    tags: [{ type: mongoose_1.Types.ObjectId, ref: "Tag" }],
-    userId: { type: mongoose_1.Types.ObjectId, ref: "User", required: true },
+const ContentSchema = new mongoose_1.default.Schema({
+    userId: {
+        type: mongoose_1.default.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+    },
+    link: {
+        type: String,
+        required: true,
+    },
+    type: {
+        type: String,
+        enum: ["twitter", "youtube", "article", "pdf", "text"],
+        required: true,
+    },
+    title: {
+        type: String,
+        required: true,
+    },
+    tags: {
+        type: [String],
+        default: [],
+    },
+    // NEW FIELDS FOR CHAT FEATURE
+    extractedText: {
+        type: String,
+        default: null,
+        // This will store the full text extracted from the URL
+    },
+    status: {
+        type: String,
+        enum: ["pending", "extracted", "failed"],
+        default: "pending",
+        // pending = just added, waiting to extract
+        // extracted = text extracted successfully
+        // failed = extraction failed (URL dead, etc)
+    },
+    extractedAt: {
+        type: Date,
+        default: null,
+    },
+    extractionError: {
+        type: String,
+        default: null,
+        // Stores error message if extraction failed
+    },
+    chunks: [{
+            _id: {
+                type: mongoose_1.default.Schema.Types.ObjectId,
+                default: new mongoose_1.default.Types.ObjectId(),
+            },
+            text: {
+                type: String,
+                required: true,
+            },
+            chunkIndex: {
+                type: Number,
+                required: true,
+            },
+            embedding: {
+                type: [Number],
+                required: true,
+            },
+        }],
+    embeddingStatus: {
+        type: String,
+        enum: ["pending", "embedded", "failed"],
+        default: "pending",
+    },
+    embeddedAt: {
+        type: Date,
+        default: null,
+    },
+    embeddingError: {
+        type: String,
+        default: null,
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
 });
 const linkSchema = new mongoose_1.Schema({
     hash: { type: String, required: true },
@@ -72,7 +146,7 @@ const linkSchema = new mongoose_1.Schema({
 });
 const User = mongoose_1.default.model("User", userSchema);
 exports.User = User;
-const Content = mongoose_1.default.model("Content", contentSchema);
+const Content = mongoose_1.default.model("Content", ContentSchema);
 exports.Content = Content;
 const Tag = mongoose_1.default.model("Tag", tagSchema);
 exports.Tag = Tag;

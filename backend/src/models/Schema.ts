@@ -66,6 +66,39 @@ const ContentSchema = new mongoose.Schema({
     default: null,
     // Stores error message if extraction failed
   },
+  chunks: [
+    {
+      _id: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: new mongoose.Types.ObjectId(),
+      },
+      text: {
+        type: String,
+        required: true,
+      },
+      chunkIndex: {
+        type: Number,
+        required: true,
+      },
+      embedding: {
+        type: [Number],
+        required: true,
+      },
+    },
+  ],
+  embeddingStatus: {
+    type: String,
+    enum: ["pending", "embedded", "failed"],
+    default: "pending",
+  },
+  embeddedAt: {
+    type: Date,
+    default: null,
+  },
+  embeddingError: {
+    type: String,
+    default: null,
+  },
 
   createdAt: {
     type: Date,

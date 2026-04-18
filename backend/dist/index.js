@@ -21,6 +21,7 @@ const autht_1 = require("./controller/autht");
 const content_1 = require("./controller/content");
 const authmid_1 = require("./middleware/authmid");
 const generateLink_1 = require("./controller/generateLink");
+const extractController_1 = require("./controller/extractController");
 const Schema_1 = require("./models/Schema");
 const MONGO_URL = process.env.MONGO_URL;
 const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
@@ -29,7 +30,7 @@ const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
         console.log("Connected to MongoDB");
     }
     catch (e) {
-        console.log("Error connecting to MongoDB"), e;
+        console.error("Error connecting to MongoDB:", e);
     }
 });
 connectToDatabase();
@@ -39,6 +40,10 @@ app.post("/api/v1/signup", autht_1.signup);
 app.post("/api/v1/content", authmid_1.userMiddleware, content_1.addContent);
 app.get("/api/v1/content", authmid_1.userMiddleware, content_1.getContent);
 app.delete("/api/v1/content", authmid_1.userMiddleware, content_1.deleteContent);
+// Extract text from a single piece of content
+app.post("/api/v1/brain/extract", authmid_1.userMiddleware, extractController_1.extractContent);
+// Extract text from ALL user's pending content
+app.post("/api/v1/brain/extract-all", authmid_1.userMiddleware, extractController_1.extractAllContent);
 app.post("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.genrateLink);
 app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const hash = req.params.shareLink;
@@ -48,15 +53,12 @@ app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void
     if (!link) {
         return res.status(404).json({ message: "Link not found" });
     }
-    // userid
     const content = yield Schema_1.Content.find({
         userId: link.userId,
     });
-    // user
     const user = yield Schema_1.User.findOne({
         _id: link.userId,
     });
-    console.log(user);
     if (!user) {
         return res.status(411).json({ message: "User not found" });
     }
@@ -66,5 +68,5 @@ app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void
     });
 }));
 app.listen(3000, () => {
-    console.log("server is running");
+    console.log("Server is running on port 3000");
 });
