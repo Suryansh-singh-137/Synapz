@@ -99,7 +99,8 @@ const ContentSchema = new mongoose_1.default.Schema({
         default: null,
         // Stores error message if extraction failed
     },
-    chunks: [{
+    chunks: [
+        {
             _id: {
                 type: mongoose_1.default.Schema.Types.ObjectId,
                 default: new mongoose_1.default.Types.ObjectId(),
@@ -116,7 +117,8 @@ const ContentSchema = new mongoose_1.default.Schema({
                 type: [Number],
                 required: true,
             },
-        }],
+        },
+    ],
     embeddingStatus: {
         type: String,
         enum: ["pending", "embedded", "failed"],
