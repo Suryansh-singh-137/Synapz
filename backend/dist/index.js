@@ -23,6 +23,7 @@ const authmid_1 = require("./middleware/authmid");
 const generateLink_1 = require("./controller/generateLink");
 const extractController_1 = require("./controller/extractController");
 const Schema_1 = require("./models/Schema");
+const chatController_1 = require("./controller/chatController");
 const MONGO_URL = process.env.MONGO_URL;
 const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -35,20 +36,21 @@ const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
 });
 connectToDatabase();
 app.use(express_1.default.json());
-console.log("Registering /api/v1/test route");
-app.get("/api/v1/test", (req, res) => {
-    res.json({ message: "Hello World" });
-});
+// ============= AUTHENTICATION =============
 app.post("/api/v1/signin", autht_1.signin);
 app.post("/api/v1/signup", autht_1.signup);
+// ============= CONTENT MANAGEMENT =============
 app.post("/api/v1/content", authmid_1.userMiddleware, content_1.addContent);
 app.get("/api/v1/content", authmid_1.userMiddleware, content_1.getContent);
 app.delete("/api/v1/content", authmid_1.userMiddleware, content_1.deleteContent);
+// ============= TEXT EXTRACTION (NEW) =============
 // Extract text from a single piece of content
 app.post("/api/v1/brain/extract", authmid_1.userMiddleware, extractController_1.extractContent);
 // Extract text from ALL user's pending content
 app.post("/api/v1/brain/extract-all", authmid_1.userMiddleware, extractController_1.extractAllContent);
+// ============= SHARE LINK MANAGEMENT =============
 app.post("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.genrateLink);
+// ============= PUBLIC BRAIN VIEWING =============
 app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const hash = req.params.shareLink;
     const link = yield Schema_1.Link.findOne({
@@ -71,6 +73,7 @@ app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void
         content: content,
     });
 }));
+app.post("/api/v1/brain/chat", authmid_1.userMiddleware, chatController_1.chatWithBrain);
 app.listen(3000, () => {
     console.log("Server is running on port 3000");
 });

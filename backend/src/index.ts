@@ -13,7 +13,7 @@ import {
   extractAllContent,
 } from "./controller/extractController";
 import { Content, Link, User } from "./models/Schema";
-
+import { chatWithBrain } from "./controller/chatController";
 const MONGO_URL = process.env.MONGO_URL!;
 
 const connectToDatabase = async () => {
@@ -27,25 +27,27 @@ const connectToDatabase = async () => {
 
 connectToDatabase();
 app.use(express.json());
-console.log("Registering /api/v1/test route");
-app.get("/api/v1/test", (req, res) => {
-  res.json({ message: "Hello World" });
-});
+
+// ============= AUTHENTICATION =============
 app.post("/api/v1/signin", signin);
 app.post("/api/v1/signup", signup);
 
+// ============= CONTENT MANAGEMENT =============
 app.post("/api/v1/content", userMiddleware, addContent);
 app.get("/api/v1/content", userMiddleware, getContent);
 app.delete("/api/v1/content", userMiddleware, deleteContent);
 
+// ============= TEXT EXTRACTION (NEW) =============
 // Extract text from a single piece of content
 app.post("/api/v1/brain/extract", userMiddleware, extractContent);
 
 // Extract text from ALL user's pending content
 app.post("/api/v1/brain/extract-all", userMiddleware, extractAllContent);
 
+// ============= SHARE LINK MANAGEMENT =============
 app.post("/api/v1/brain/share", userMiddleware, genrateLink);
 
+// ============= PUBLIC BRAIN VIEWING =============
 app.get("/api/v1/brain/:shareLink", async (req, res) => {
   const hash = req.params.shareLink;
 
@@ -74,7 +76,7 @@ app.get("/api/v1/brain/:shareLink", async (req, res) => {
     content: content,
   });
 });
-
+app.post("/api/v1/brain/chat", userMiddleware, chatWithBrain);
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
 });

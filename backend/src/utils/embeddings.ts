@@ -1,9 +1,17 @@
-import OpenAI from "openai";
+import axios from "axios";
 
 /**
- * FIXED embeddings - Debug the 405 error
- * 405 usually means: wrong API key or malformed request
+ * COHERE EMBEDDINGS - LATEST MODEL
+ * Using embed-english-v3.0 (latest, best quality)
  */
+
+const COHERE_API_KEY = process.env.COHERE_API_KEY;
+
+if (!COHERE_API_KEY) {
+  console.warn(
+    "[EMBED] ⚠️ COHERE_API_KEY not set. Get free key at: https://dashboard.cohere.com/",
+  );
+}
 
 export async function getEmbedding(text: string): Promise<number[]> {
   try {
@@ -13,58 +21,52 @@ export async function getEmbedding(text: string): Promise<number[]> {
       throw new Error("Text is empty");
     }
 
-    // Check API key FIRST
-    const apiKey = process.env.OPEN_ROUTER_API_KEY;
-    if (!apiKey) {
-      console.error("[EMBED] ❌ OPEN_ROUTER_API_KEY not set!");
-      throw new Error("OPEN_ROUTER_API_KEY not in .env");
-    }
-
-    if (!apiKey.startsWith("sk-or-v1-")) {
-      console.error(
-        "[EMBED] ❌ Wrong API key format! Should start with 'sk-or-v1-'",
+    if (!COHERE_API_KEY) {
+      throw new Error(
+        "COHERE_API_KEY not set. Get free key at: https://dashboard.cohere.com/",
       );
-      console.error(`[EMBED] Got: ${apiKey.substring(0, 20)}...`);
-      throw new Error("Invalid Open Router API key format");
     }
 
-    console.log(
-      `[EMBED] Using model: ${process.env.OPEN_ROUTER_EMBEDDING_MODEL || "openai/text-embedding-3-small"}`,
+    console.log("[EMBED] Using Cohere embed-english-v3.0 (latest model)");
+
+    // Using latest Cohere model: embed-english-v3.0
+    const response = await axios.post(
+      "https://api.cohere.com/v1/embed",
+      {
+        texts: [cleanText],
+        model: "embed-english-v3.0", // Latest model
+        input_type: "search_document",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${COHERE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
+      },
     );
 
-    // Create client with explicit settings
-    const client = new OpenAI({
-      apiKey: apiKey,
-      baseURL: "https://openrouter.io/api/v1",
-      defaultHeaders: {
-        "HTTP-Referer": "https://brain.local",
-        "X-Title": "SecondBrain",
-      },
-    });
-
-    console.log(`[EMBED] Sending request to Open Router...`);
-
-    // Make the request
-    const response = await client.embeddings.create({
-      model:
-        process.env.OPEN_ROUTER_EMBEDDING_MODEL ||
-        "openai/text-embedding-3-small",
-      input: cleanText,
-    });
-
-    if (!response.data || response.data.length === 0) {
-      throw new Error("No embedding in response");
+    if (!response.data.embeddings || response.data.embeddings.length === 0) {
+      throw new Error("No embedding returned from Cohere");
     }
 
-    const embedding = response.data[0].embedding;
+    const embedding = response.data.embeddings[0];
 
     console.log(`[EMBED] ✓ Got embedding: ${embedding.length} dimensions`);
     return embedding;
   } catch (error: any) {
     console.error("[EMBED] ❌ Error:", error.message);
-    if (error.response?.status === 405) {
-      console.error("[EMBED] 405 = Method Not Allowed. Check your API key!");
+
+    if (error.response?.status === 401) {
+      console.error(
+        "[EMBED] 401 - Invalid API key. Check COHERE_API_KEY in .env",
+      );
     }
+
+    if (error.response?.status === 404) {
+      console.error("[EMBED] 404 - Check API endpoint");
+    }
+
     throw error;
   }
 }
@@ -82,43 +84,54 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
       throw new Error("No valid texts to embed");
     }
 
-    // Check API key FIRST
-    const apiKey = process.env.OPEN_ROUTER_API_KEY;
-    if (!apiKey) {
-      console.error("[EMBED] ❌ OPEN_ROUTER_API_KEY not set!");
-      throw new Error("OPEN_ROUTER_API_KEY not in .env");
+    if (!COHERE_API_KEY) {
+      throw new Error(
+        "COHERE_API_KEY not set. Get free key at: https://dashboard.cohere.com/",
+      );
     }
 
-    console.log(`[EMBED] Getting embeddings for ${cleanTexts.length} texts...`);
+    console.log(
+      `[EMBED] Getting embeddings for ${cleanTexts.length} texts via Cohere...`,
+    );
 
-    const client = new OpenAI({
-      apiKey: apiKey,
-      baseURL: "https://openrouter.io/api/v1",
-      defaultHeaders: {
-        "HTTP-Referer": "https://brain.local",
-        "X-Title": "SecondBrain",
+    // Using latest Cohere model: embed-english-v3.0
+    const response = await axios.post(
+      "https://api.cohere.com/v1/embed",
+      {
+        texts: cleanTexts,
+        model: "embed-english-v3.0", // Latest model
+        input_type: "search_document",
       },
-    });
+      {
+        headers: {
+          Authorization: `Bearer ${COHERE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000,
+      },
+    );
 
-    const response = await client.embeddings.create({
-      model:
-        process.env.OPEN_ROUTER_EMBEDDING_MODEL ||
-        "openai/text-embedding-3-small",
-      input: cleanTexts,
-    });
-
-    if (!response.data) {
-      throw new Error("No data in response");
+    if (!response.data.embeddings) {
+      throw new Error("No embeddings returned from Cohere");
     }
 
-    const embeddings = response.data
-      .sort((a, b) => a.index - b.index)
-      .map((item) => item.embedding);
+    const embeddings = response.data.embeddings;
 
-    console.log(`[EMBED] ✓ Got ${embeddings.length} embeddings`);
+    console.log(
+      `[EMBED] ✓ Got ${embeddings.length} embeddings (1024 dimensions)`,
+    );
     return embeddings;
   } catch (error: any) {
     console.error("[EMBED] ❌ Error:", error.message);
+
+    if (error.response?.status === 401) {
+      console.error("[EMBED] 401 - Invalid API key");
+    }
+
+    if (error.response?.status === 404) {
+      console.error("[EMBED] 404 - Endpoint not found");
+    }
+
     throw error;
   }
 }
