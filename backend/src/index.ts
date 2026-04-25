@@ -27,7 +27,10 @@ const connectToDatabase = async () => {
 
 connectToDatabase();
 app.use(express.json());
-
+console.log("Registering /api/v1/test route");
+app.get("/api/v1/test", (req, res) => {
+  res.json({ message: "Hello World" });
+});
 app.post("/api/v1/signin", signin);
 app.post("/api/v1/signup", signup);
 

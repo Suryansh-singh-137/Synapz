@@ -1,82 +1,69 @@
+/**
+ * JINA AI READER - Production Ready URL to Text
+ *
+ * Works with:
+ * ✅ Dynamic JS-rendered content
+ * ✅ PDFs
+ * ✅ Tweets
+ * ✅ Any website (no scraping needed)
+ *
+ * Free tier: 1000 requests/month
+ * Perfect for prototyping & small apps
+ *
+ * Docs: https://jina.ai/reader/
+ */
+
 import axios from "axios";
-import * as cheerio from "cheerio";
 
 /**
- * SIMPLE & WORKING extraction method
- * Uses better headers and smarter parsing
+ * Extract text from ANY URL using Jina Reader API
+ * No scraping, no selectors, no bot detection
+ * Returns clean markdown
  */
 export async function extractTextFromUrl(url: string): Promise<string> {
   try {
-    console.log(`[EXTRACT] Fetching: ${url}`);
+    console.log(`[EXTRACT] Using Jina Reader for: ${url}`);
 
-    // Step 1: Fetch with proper headers
-    const { data } = await axios.get(url, {
+    // Simple: just prepend Jina reader endpoint
+    const jinaUrl = `https://r.jina.ai/${url}`;
+
+    const response = await axios.get(jinaUrl, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        Connection: "keep-alive",
+        Accept: "text/plain",
       },
-      timeout: 10000,
+      timeout: 15000,
     });
 
-    // Step 2: Parse HTML with Cheerio
-    const $ = cheerio.load(data);
+    const text = response.data;
 
-    // Remove unwanted elements
-    $("script, style, nav, footer, iframe, noscript").remove();
-    $("[class*='cookie'], [class*='popup'], [class*='ad']").remove();
-
-    // Step 3: Extract text from main content
-    let text = "";
-
-    // Try these selectors in order
-    const selectors = [
-      "article",
-      "main",
-      "[role='main']",
-      ".post-content",
-      ".article-body",
-      ".content",
-      "body",
-    ];
-
-    for (const selector of selectors) {
-      const element = $(selector);
-      if (element.length > 0) {
-        text = element.text();
-        if (text.length > 200) break;
-      }
+    if (!text || text.trim().length < 100) {
+      throw new Error(`Extracted text too short (${text.length} chars)`);
     }
-
-    // Step 4: Clean the text
-    text = text
-      .replace(/\s+/g, " ") // Multiple spaces to single
-      .replace(/\n+/g, " ") // Newlines to space
-      .trim();
 
     console.log(`[EXTRACT] ✓ Got ${text.length} characters`);
     return text;
   } catch (error: any) {
-    const msg = error.response?.status
-      ? `HTTP ${error.response.status}`
-      : error.message;
+    const msg = error.message || "Unknown error";
     console.error(`[EXTRACT] ✗ Failed: ${msg}`);
-    throw new Error(`Failed to fetch URL: ${msg}`);
+    throw new Error(`Failed to extract from URL: ${msg}`);
   }
 }
 
 /**
- * SIMPLE chunking - split into word-based chunks
+ * Chunk text into overlapping pieces
  */
 export function chunkText(
   text: string,
   chunkSize: number = 500,
   overlap: number = 50,
 ): string[] {
+  if (!text || text.trim().length === 0) {
+    console.log("[CHUNK] Text is empty!");
+    return [];
+  }
+
   const words = text.split(/\s+/).filter((w) => w.length > 0);
+
   const chunks: string[] = [];
 
   for (let i = 0; i < words.length; i += chunkSize - overlap) {
@@ -86,6 +73,9 @@ export function chunkText(
     }
   }
 
-  console.log(`[CHUNK] Created ${chunks.length} chunks`);
+  console.log(
+    `[CHUNK] Created ${chunks.length} chunks from ${words.length} words`,
+  );
+
   return chunks.length > 0 ? chunks : [text];
 }

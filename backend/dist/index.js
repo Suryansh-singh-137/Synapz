@@ -35,6 +35,10 @@ const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
 });
 connectToDatabase();
 app.use(express_1.default.json());
+console.log("Registering /api/v1/test route");
+app.get("/api/v1/test", (req, res) => {
+    res.json({ message: "Hello World" });
+});
 app.post("/api/v1/signin", autht_1.signin);
 app.post("/api/v1/signup", autht_1.signup);
 app.post("/api/v1/content", authmid_1.userMiddleware, content_1.addContent);

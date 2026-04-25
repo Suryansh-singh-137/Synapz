@@ -50,74 +50,78 @@ exports.chunkText = chunkText;
 const axios_1 = __importDefault(require("axios"));
 const cheerio = __importStar(require("cheerio"));
 /**
- * Extracts clean text from a URL
- * Handles: Articles, blogs, Twitter threads, HTML pages
+ * SIMPLE & WORKING extraction method
+ * Uses better headers and smarter parsing
  */
 function extractTextFromUrl(url) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         try {
-            // Step 1: Fetch the HTML from the URL
-            const response = yield axios_1.default.get(url, {
-                timeout: 10000, // 10 second timeout
+            console.log(`[EXTRACT] Fetching: ${url}`);
+            // Step 1: Fetch with proper headers
+            const { data } = yield axios_1.default.get(url, {
                 headers: {
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                    Connection: "keep-alive",
                 },
+                timeout: 10000,
             });
-            const html = response.data;
-            // Step 2: Parse HTML with cheerio
-            const $ = cheerio.load(html);
-            // Step 3: Remove script and style tags (they contain code, not content)
-            $("script").remove();
-            $("style").remove();
-            $("nav").remove(); // Navigation often has repetitive text
-            $("footer").remove(); // Footer is usually boilerplate
-            // Step 4: Extract text from common content containers
-            // Try different selectors in order of specificity
+            // Step 2: Parse HTML with Cheerio
+            const $ = cheerio.load(data);
+            // Remove unwanted elements
+            $("script, style, nav, footer, iframe, noscript").remove();
+            $("[class*='cookie'], [class*='popup'], [class*='ad']").remove();
+            // Step 3: Extract text from main content
             let text = "";
-            // For articles/blogs
-            const article = $("article").text();
-            const main = $("main").text();
-            const post = $('[class*="post"]').text();
-            const content = $('[class*="content"]').text();
-            // Pick the longest one (usually the most content)
-            text = [article, main, post, content].sort((a, b) => b.length - a.length)[0];
-            // Fallback: if none found, use body text
-            if (!text || text.trim().length < 100) {
-                text = $("body").text();
+            // Try these selectors in order
+            const selectors = [
+                "article",
+                "main",
+                "[role='main']",
+                ".post-content",
+                ".article-body",
+                ".content",
+                "body",
+            ];
+            for (const selector of selectors) {
+                const element = $(selector);
+                if (element.length > 0) {
+                    text = element.text();
+                    if (text.length > 200)
+                        break;
+                }
             }
-            // Step 5: Clean up the text
-            // Remove extra whitespace, newlines, multiple spaces
+            // Step 4: Clean the text
             text = text
-                .replace(/\s+/g, " ") // Replace multiple spaces with single space
-                .replace(/\n\n+/g, "\n") // Replace multiple newlines with single newline
+                .replace(/\s+/g, " ") // Multiple spaces to single
+                .replace(/\n+/g, " ") // Newlines to space
                 .trim();
-            // Step 6: Validate we got something meaningful
-            if (!text || text.length < 50) {
-                throw new Error("Could not extract meaningful text from URL");
-            }
+            console.log(`[EXTRACT] ✓ Got ${text.length} characters`);
             return text;
         }
         catch (error) {
-            if (axios_1.default.isAxiosError(error)) {
-                throw new Error(`Failed to fetch URL: ${error.message}`);
-            }
-            throw error;
+            const msg = ((_a = error.response) === null || _a === void 0 ? void 0 : _a.status)
+                ? `HTTP ${error.response.status}`
+                : error.message;
+            console.error(`[EXTRACT] ✗ Failed: ${msg}`);
+            throw new Error(`Failed to fetch URL: ${msg}`);
         }
     });
 }
 /**
- * Chunks text into smaller pieces for embedding
- * Each chunk is ~500 words, with 50 word overlap
- * This helps with context in RAG (Retrieval Augmented Generation)
+ * SIMPLE chunking - split into word-based chunks
  */
-function chunkText(text, chunkSize = 500, overlapSize = 50) {
-    const words = text.split(/\s+/);
+function chunkText(text, chunkSize = 500, overlap = 50) {
+    const words = text.split(/\s+/).filter((w) => w.length > 0);
     const chunks = [];
-    for (let i = 0; i < words.length; i += chunkSize - overlapSize) {
+    for (let i = 0; i < words.length; i += chunkSize - overlap) {
         const chunk = words.slice(i, i + chunkSize).join(" ");
-        if (chunk.trim().length > 0) {
+        if (chunk.length > 50) {
             chunks.push(chunk);
         }
     }
-    return chunks;
+    console.log(`[CHUNK] Created ${chunks.length} chunks`);
+    return chunks.length > 0 ? chunks : [text];
 }
