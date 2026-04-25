@@ -3,29 +3,24 @@ import { searchRelevantChunks } from "../utils/vectorSearch";
 import Groq from "groq-sdk";
 
 /**
- * Initialize Groq client for chat
- * Groq is FREE, super fast, and perfect for chat responses
+ * Initialize Groq client
+ * Using latest available model
  */
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
 /**
- * Endpoint: POST /api/v1/brain/chat
+ * POST /api/v1/brain/chat
  *
- * Hybrid approach for maximum efficiency:
- * - Embeddings: Open Router (flexible, fallback support)
- * - Chat: Groq (FREE, ultra-fast)
+ * Chat with your brain using semantic search + Groq LLM
  *
- * Cost breakdown:
- * - Embeddings: ~$0.00001 per question (cheap)
- * - Chat: $0.00 (FREE!)
- * Total: Almost free!
- *
- * Speed:
- * - Embeddings: ~100ms (Open Router)
- * - Chat: ~200ms (Groq - fastest!)
- * - Total response: ~300ms
+ * Flow:
+ * 1. User asks a question
+ * 2. Search for relevant chunks from their brain
+ * 3. Build prompt with context
+ * 4. Call Groq to generate answer
+ * 5. Return answer + sources
  */
 export const chatWithBrain = async (req: Request, res: Response) => {
   try {
@@ -39,9 +34,10 @@ export const chatWithBrain = async (req: Request, res: Response) => {
       });
     }
 
+    console.log(`[CHAT] User query: "${query}"`);
+
     // Step 1: Search for relevant chunks
-    // Uses Open Router embeddings (with automatic fallback)
-    console.log(`Searching brain for: "${query}"`);
+    console.log("[CHAT] Searching brain for relevant content...");
     const relevantChunks = await searchRelevantChunks(query, userId, 5);
 
     if (relevantChunks.length === 0) {
@@ -53,18 +49,22 @@ export const chatWithBrain = async (req: Request, res: Response) => {
       });
     }
 
+    console.log(`[CHAT] Found ${relevantChunks.length} relevant chunks`);
+
     // Step 2: Build context from chunks
     const context = relevantChunks
       .map(
         (chunk, index) =>
-          `Source ${index + 1} (from "${chunk.title}", relevance: ${(chunk.similarity * 100).toFixed(1)}%):\n${chunk.chunkText}`,
+          `Source ${index + 1} (relevance: ${(chunk.similarity * 100).toFixed(
+            1,
+          )}%):\n${chunk.chunkText}`,
       )
       .join("\n\n---\n\n");
 
-    // Step 3: Build prompt for Groq LLM
+    // Step 3: Build prompt for LLM
     const systemPrompt = `You are a helpful assistant that answers questions based on the user's personal knowledge base (their "brain").
 Use the provided context to answer questions accurately. If the context doesn't contain relevant information, say so.
-Always be honest about what you know from their content.
+Always be honest about what you know from their content and what you're inferring.
 Keep answers concise and to the point.`;
 
     const userPrompt = `Based on the following content from my brain, please answer my question:
@@ -76,8 +76,9 @@ MY QUESTION: ${query}
 
 Please provide a clear, concise answer based on the content provided.`;
 
-    // Step 4: Call Groq (FREE!)
-    console.log("Calling Groq for response (FREE!)...");
+    // Step 4: Call Groq with latest model
+    console.log("[CHAT] Calling Groq LLM for response...");
+
     const response = await groq.chat.completions.create({
       messages: [
         {
@@ -89,15 +90,19 @@ Please provide a clear, concise answer based on the content provided.`;
           content: userPrompt,
         },
       ],
-      model: process.env.GROQ_MODEL || "mixtral-8x7b-32768", // Free model on Groq
+      // Using latest Groq model - see available models at:
+      // https://console.groq.com/docs/models
+      model: "llama-3.3-70b-versatile", // Latest model (llama-3.3-70b)
       temperature: 0.7,
-      max_tokens: 1000,
+      max_completion_tokens: 1000,
     });
 
     const answer =
       response.choices[0].message.content || "Could not generate an answer.";
 
-    // Step 5: Extract sources (which chunks were used)
+    console.log("[CHAT] ✓ Got response from Groq");
+
+    // Step 5: Extract sources
     const sources = relevantChunks.map((chunk) => ({
       title: chunk.title,
       link: chunk.link,
@@ -111,13 +116,12 @@ Please provide a clear, concise answer based on the content provided.`;
       query: query,
       answer: answer,
       sources: sources,
-      llm: {
-        embeddings: "Open Router (with fallback)",
-        chat: "Groq (FREE!)",
-      },
+      model: "Groq (llama-3.3-70b-versatile)",
     });
+
+    console.log("[CHAT] ✓ Chat response sent to user");
   } catch (error) {
-    console.error("Chat error:", error);
+    console.error("[CHAT] ❌ Error:", error);
     return res.status(500).json({
       message: "Failed to generate answer",
       error: error instanceof Error ? error.message : "Unknown error",
@@ -126,10 +130,7 @@ Please provide a clear, concise answer based on the content provided.`;
 };
 
 /**
- * Alternative: Chat with public shared brain
- * Anyone with the share link can chat (read-only)
- *
- * Endpoint: POST /api/v1/brain/:shareLink/chat
+ * Chat with public shared brain (if implemented later)
  */
 export const chatWithSharedBrain = async (req: Request, res: Response) => {
   try {
@@ -147,7 +148,7 @@ export const chatWithSharedBrain = async (req: Request, res: Response) => {
       message: "Shared brain chat not yet implemented",
     });
   } catch (error) {
-    console.error("Shared chat error:", error);
+    console.error("[CHAT] ❌ Shared chat error:", error);
     return res.status(500).json({
       message: "Failed to generate answer",
       error: error instanceof Error ? error.message : "Unknown error",
