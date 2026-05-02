@@ -4,16 +4,30 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 
 dotenv.config();
+
+// ============ IMPORTS ============
 import { signin, signup } from "./controller/autht";
 import { addContent, deleteContent, getContent } from "./controller/content";
 import { userMiddleware } from "./middleware/authmid";
 import { genrateLink } from "./controller/generateLink";
+import { chatWithBrain } from "./controller/chatController"; // ✅ ADD THIS
 import {
   extractContent,
   extractAllContent,
 } from "./controller/extractController";
 import { Content, Link, User } from "./models/Schema";
-import { chatWithBrain } from "./controller/chatController";
+
+// ✅ IMPORT VALIDATION SCHEMAS AND MIDDLEWARE
+import {
+  SignupSchema,
+  SigninSchema,
+  AddContentSchema,
+  ChatSchema,
+  DeleteContentSchema,
+  validateRequest,
+} from "./utils/validation";
+
+// ============ DATABASE ============
 const MONGO_URL = process.env.MONGO_URL!;
 
 const connectToDatabase = async () => {
@@ -26,28 +40,60 @@ const connectToDatabase = async () => {
 };
 
 connectToDatabase();
+
+// ============ MIDDLEWARE ============
 app.use(express.json());
 
-// ============= AUTHENTICATION =============
-app.post("/api/v1/signin", signin);
-app.post("/api/v1/signup", signup);
+// ============ HEALTH CHECK ============
+console.log("Registering /api/v1/test route");
+app.get("/api/v1/test", (req, res) => {
+  res.json({ message: "Hello World" });
+});
 
-// ============= CONTENT MANAGEMENT =============
-app.post("/api/v1/content", userMiddleware, addContent);
+// ============ AUTHENTICATION ROUTES ============
+// ✅ WITH VALIDATION
+app.post("/api/v1/signin", validateRequest(SigninSchema), signin);
+
+app.post("/api/v1/signup", validateRequest(SignupSchema), signup);
+
+// ============ CONTENT ROUTES ============
+// ✅ WITH VALIDATION
+app.post(
+  "/api/v1/content",
+  userMiddleware,
+  validateRequest(AddContentSchema),
+  addContent,
+);
+
 app.get("/api/v1/content", userMiddleware, getContent);
-app.delete("/api/v1/content", userMiddleware, deleteContent);
 
-// ============= TEXT EXTRACTION (NEW) =============
+app.delete(
+  "/api/v1/content",
+  userMiddleware,
+  validateRequest(DeleteContentSchema),
+  deleteContent,
+);
+
+// ============ BRAIN ROUTES ============
 // Extract text from a single piece of content
 app.post("/api/v1/brain/extract", userMiddleware, extractContent);
 
 // Extract text from ALL user's pending content
 app.post("/api/v1/brain/extract-all", userMiddleware, extractAllContent);
 
-// ============= SHARE LINK MANAGEMENT =============
+// ✅ CHAT ENDPOINT WITH VALIDATION
+app.post(
+  "/api/v1/brain/chat",
+  userMiddleware,
+  validateRequest(ChatSchema),
+  chatWithBrain,
+);
+
+// Share brain
 app.post("/api/v1/brain/share", userMiddleware, genrateLink);
 
-// ============= PUBLIC BRAIN VIEWING =============
+// ============ PUBLIC ROUTES ============
+// View shared brain (no auth needed)
 app.get("/api/v1/brain/:shareLink", async (req, res) => {
   const hash = req.params.shareLink;
 
@@ -76,7 +122,10 @@ app.get("/api/v1/brain/:shareLink", async (req, res) => {
     content: content,
   });
 });
-app.post("/api/v1/brain/chat", userMiddleware, chatWithBrain);
+
+// ============ SERVER ============
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
 });
+
+export default app;
