@@ -23,10 +23,8 @@ export const SigninSchema = z.object({
 // Add content schema
 export const AddContentSchema = z.object({
   link: z.string().url("Invalid URL").optional(),
-  type: z.enum(["article", "tweet", "pdf", "text", "note"], {
-    errorMap: () => ({
-      message: "Type must be one of: article, tweet, pdf, text, note",
-    }),
+  type: z.enum(["article", "tweet", "pdf", "text", "youtube"], {
+    message: "Type must be one of: article, tweet, pdf, text, youtube",
   }),
   title: z
     .string()
@@ -68,7 +66,7 @@ export const validateRequest = (schema: z.ZodSchema) => {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           message: "Validation failed",
-          errors: error.errors.map((err) => ({
+          errors: error.issues.map((err: z.ZodIssue) => ({
             field: err.path.join("."),
             message: err.message,
           })),
