@@ -10,14 +10,14 @@ import { signin, signup } from "./controller/autht";
 import { addContent, deleteContent, getContent } from "./controller/content";
 import { userMiddleware } from "./middleware/authmid";
 import { genrateLink } from "./controller/generateLink";
-import { chatWithBrain } from "./controller/chatController"; // ✅ ADD THIS
+import { chatWithBrain } from "./controller/chatController";
 import {
   extractContent,
   extractAllContent,
 } from "./controller/extractController";
 import { Content, Link, User } from "./models/Schema";
 
-// ✅ IMPORT VALIDATION SCHEMAS AND MIDDLEWARE
+// ✅ IMPORT VALIDATION AND FILE UPLOAD
 import {
   SignupSchema,
   SigninSchema,
@@ -26,6 +26,7 @@ import {
   DeleteContentSchema,
   validateRequest,
 } from "./utils/validation";
+import { upload, uploadPdfFile } from "./utils/fileUpload";
 
 // ============ DATABASE ============
 const MONGO_URL = process.env.MONGO_URL!;
@@ -51,16 +52,15 @@ app.get("/api/v1/test", (req, res) => {
 });
 
 // ============ AUTHENTICATION ROUTES ============
-// ✅ WITH VALIDATION
 app.post("/api/v1/signin", validateRequest(SigninSchema), signin);
-
 app.post("/api/v1/signup", validateRequest(SignupSchema), signup);
 
 // ============ CONTENT ROUTES ============
-// ✅ WITH VALIDATION
+// Add content (with optional file upload for PDFs)
 app.post(
   "/api/v1/content",
   userMiddleware,
+  upload.single("file"), // Handle single file upload
   validateRequest(AddContentSchema),
   addContent,
 );
@@ -74,14 +74,18 @@ app.delete(
   deleteContent,
 );
 
-// ============ BRAIN ROUTES ============
-// Extract text from a single piece of content
-app.post("/api/v1/brain/extract", userMiddleware, extractContent);
+// ✅ FILE UPLOAD ENDPOINT (optional alternative)
+app.post(
+  "/api/v1/upload-pdf",
+  userMiddleware,
+  upload.single("file"),
+  uploadPdfFile,
+);
 
-// Extract text from ALL user's pending content
+// ============ BRAIN ROUTES ============
+app.post("/api/v1/brain/extract", userMiddleware, extractContent);
 app.post("/api/v1/brain/extract-all", userMiddleware, extractAllContent);
 
-// ✅ CHAT ENDPOINT WITH VALIDATION
 app.post(
   "/api/v1/brain/chat",
   userMiddleware,
@@ -89,29 +93,20 @@ app.post(
   chatWithBrain,
 );
 
-// Share brain
 app.post("/api/v1/brain/share", userMiddleware, genrateLink);
 
 // ============ PUBLIC ROUTES ============
-// View shared brain (no auth needed)
 app.get("/api/v1/brain/:shareLink", async (req, res) => {
   const hash = req.params.shareLink;
 
-  const link = await Link.findOne({
-    hash: hash,
-  });
+  const link = await Link.findOne({ hash: hash });
 
   if (!link) {
     return res.status(404).json({ message: "Link not found" });
   }
 
-  const content = await Content.find({
-    userId: link.userId,
-  });
-
-  const user = await User.findOne({
-    _id: link.userId,
-  });
+  const content = await Content.find({ userId: link.userId });
+  const user = await User.findOne({ _id: link.userId });
 
   if (!user) {
     return res.status(411).json({ message: "User not found" });
@@ -120,6 +115,15 @@ app.get("/api/v1/brain/:shareLink", async (req, res) => {
   res.json({
     username: user.username,
     content: content,
+  });
+});
+
+// ============ ERROR HANDLING ============
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Error:", err.message);
+  res.status(500).json({
+    message: "Server error",
+    error: err.message,
   });
 });
 

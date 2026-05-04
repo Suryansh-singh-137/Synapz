@@ -22,17 +22,12 @@ export const SigninSchema = z.object({
 
 // Add content schema
 export const AddContentSchema = z.object({
-  link: z.string().url("Invalid URL").optional(),
-  type: z.enum(["article", "tweet", "pdf", "text", "youtube"], {
-    message: "Type must be one of: article, tweet, pdf, text, youtube",
-  }),
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(200, "Title must be at most 200 characters"),
+  link: z.string().url().optional(), // For URLs
+  file: z.instanceof(File).optional(), // For PDF file upload
+  type: z.enum(["article", "tweet", "pdf", "youtube", "text"]),
+  title: z.string().min(1).max(200),
   tags: z.array(z.string()).optional(),
 });
-
 // Chat schema
 export const ChatSchema = z.object({
   query: z

@@ -2,73 +2,92 @@ import { Request, Response } from "express";
 import { Content } from "../models/Schema";
 import { extractTextFromUrl, chunkText } from "../utils/extractText";
 import { getEmbeddings } from "../utils/embeddings";
+import { uploadPdfToCloudinary } from "../utils/fileUpload";
 import mongoose from "mongoose";
 
 /**
  * POST /api/v1/content
- *
- * Add new content to user's brain
- * Automatically triggers extraction and embedding in background
+ * Add new content (article, tweet, YouTube, PDF, or text)
  */
-const addContent = async (req: Request, res: Response) => {
+export const addContent = async (req: Request, res: Response) => {
   try {
-    const { link, type, title, tags } = req.body;
+    let { link, type, title, tags } = req.body;
     const userId = (req as any).userId;
 
-    // Validate input
-    if (!link || !type || !title) {
+    console.log(`[CONTENT] Adding ${type}: ${title}`);
+
+    // Validate required fields
+    if (!type || !title) {
       return res.status(400).json({
-        message: "link, type, and title are required",
+        message: "type and title are required",
       });
     }
 
-    // Step 1: Create content document
+    let finalLink = link;
+
+    // Handle PDF file upload
+    if (type === "pdf" && req.file) {
+      console.log("[CONTENT] Uploading PDF to Cloudinary...");
+      finalLink = await uploadPdfToCloudinary(req.file.path);
+      console.log(`[CONTENT] PDF URL: ${finalLink}`);
+    }
+
+    // If type is PDF or link-based, must have link
+    if (
+      (type === "pdf" ||
+        type === "article" ||
+        type === "youtube" ||
+        type === "tweet") &&
+      !finalLink
+    ) {
+      return res.status(400).json({
+        message: `${type} requires a link`,
+      });
+    }
+
+    // Create content document
     const content = await Content.create({
-      link,
+      link: finalLink,
       type,
       title,
       tags: tags || [],
       userId,
-      status: "pending", // Will be updated by background process
-      embeddingStatus: "pending", // Will be updated by background process
+      status: "pending",
+      embeddingStatus: "pending",
     });
 
-    // Step 2: Return immediately to user
+    // Return immediately
     res.status(200).json({
       message: "Content added successfully. Processing in background...",
       contentId: content._id,
       status: "processing",
     });
 
-    // Step 3: Start background processing (don't await!)
-    // User gets response immediately while this runs
-    processContentInBackground(content._id.toString(), link).catch((error) => {
-      console.error(`Background processing failed for ${content._id}:`, error);
-    });
-  } catch (e) {
-    console.error("Error adding content:", e);
+    // Start background processing
+    processContentInBackground(content._id.toString(), finalLink, type).catch(
+      (error) => {
+        console.error("[CONTENT] Background processing failed:", error);
+      },
+    );
+  } catch (error: any) {
+    console.error("[CONTENT] ❌ Error adding content:", error.message);
     res.status(500).json({
       message: "Failed to add content",
+      error: error.message,
     });
   }
 };
 
 /**
  * GET /api/v1/content
- *
- * Fetch all content for the logged-in user
- * Returns content with status (pending, extracted, embedded, failed)
+ * Get all user's content
  */
-const getContent = async (req: Request, res: Response) => {
+export const getContent = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
 
-    // Fetch all content for this user
-    const content = await Content.find({
-      userId: userId,
-    }).sort({ createdAt: -1 }); // Most recent first
+    const content = await Content.find({ userId }).sort({ createdAt: -1 });
 
-    // Return with status information
     res.status(200).json({
       message: "Content retrieved successfully",
       total: content.length,
@@ -85,11 +104,11 @@ const getContent = async (req: Request, res: Response) => {
         extractionError: c.extractionError,
         embeddingError: c.embeddingError,
         createdAt: c.createdAt,
-        chunkCount: c.chunks?.length || 0,
+        chunkCount: (c as any).chunks?.length || 0,
       })),
     });
-  } catch (e) {
-    console.error("Error fetching content:", e);
+  } catch (error: any) {
+    console.error("[CONTENT] ❌ Error fetching content:", error.message);
     res.status(500).json({
       message: "Failed to fetch content",
     });
@@ -98,23 +117,19 @@ const getContent = async (req: Request, res: Response) => {
 
 /**
  * DELETE /api/v1/content
- *
- * Delete content by ID (verify user owns it)
- * Body: { contentId: "507f..." }
+ * Delete content by ID
  */
-const deleteContent = async (req: Request, res: Response) => {
+export const deleteContent = async (req: Request, res: Response) => {
   try {
     const { contentId } = req.body;
     const userId = (req as any).userId;
 
-    // Validate input
     if (!contentId) {
       return res.status(400).json({
         message: "contentId is required",
       });
     }
 
-    // Find and delete (verify user owns it)
     const deletedContent = await Content.findOneAndDelete({
       _id: contentId,
       userId: userId,
@@ -122,7 +137,7 @@ const deleteContent = async (req: Request, res: Response) => {
 
     if (!deletedContent) {
       return res.status(404).json({
-        message: "Content not found or you don't have permission to delete it",
+        message: "Content not found",
       });
     }
 
@@ -130,8 +145,8 @@ const deleteContent = async (req: Request, res: Response) => {
       message: "Content deleted successfully",
       deletedId: contentId,
     });
-  } catch (e) {
-    console.error("Error deleting content:", e);
+  } catch (error: any) {
+    console.error("[CONTENT] ❌ Error deleting content:", error.message);
     res.status(500).json({
       message: "Failed to delete content",
     });
@@ -139,63 +154,64 @@ const deleteContent = async (req: Request, res: Response) => {
 };
 
 /**
- * Background processing: Extract + Embed
- * Runs AFTER user gets response
- * Doesn't block the request
+ * Background processing: Extract text and create embeddings
  */
 async function processContentInBackground(
   contentId: string,
   link: string,
+  type: string,
 ): Promise<void> {
   try {
-    console.log(`Starting background processing for ${contentId}...`);
+    console.log(`[PROCESS] Starting for ${type}: ${contentId}`);
 
-    // ============= EXTRACTION PHASE =============
+    let extractedText = "";
+
+    // ============ EXTRACTION PHASE ============
     try {
-      console.log(`Extracting text from: ${link}`);
-      const extractedText = await extractTextFromUrl(link);
+      console.log(`[EXTRACT] Processing ${type}...`);
+
+      // Handle text type (user provides text directly)
+      if (type === "text") {
+        // For text type, extractedText is already in the field
+        const content = await Content.findById(contentId);
+        extractedText = (content as any).extractedText || "";
+      } else {
+        // For all other types (articles, tweets, YouTube, PDFs), extract from URL
+        extractedText = await extractTextFromUrl(link);
+      }
+
+      if (!extractedText || extractedText.trim().length < 50) {
+        throw new Error("Extracted text too short");
+      }
 
       await Content.findByIdAndUpdate(contentId, {
-        extractedText: extractedText,
+        extractedText,
         status: "extracted",
         extractedAt: new Date(),
       });
 
-      console.log(`✓ Extraction complete for ${contentId}`);
-    } catch (extractError) {
-      console.error(`✗ Extraction failed for ${contentId}:`, extractError);
+      console.log(`[EXTRACT] ✓ Got ${extractedText.length} characters`);
+    } catch (extractError: any) {
+      console.error("[EXTRACT] ❌ Failed:", extractError.message);
       await Content.findByIdAndUpdate(contentId, {
         status: "failed",
-        extractionError:
-          extractError instanceof Error
-            ? extractError.message
-            : "Unknown error",
+        extractionError: extractError.message,
       });
-      return; // Stop here if extraction fails
+      return;
     }
 
-    // ============= EMBEDDING PHASE =============
+    // ============ EMBEDDING PHASE ============
     try {
-      // Get the updated content with extracted text
-      const content = await Content.findById(contentId);
+      console.log("[EMBED] Creating embeddings...");
 
-      if (!content || !content.extractedText) {
-        throw new Error("No extracted text found");
-      }
-
-      console.log(`Creating embeddings for ${contentId}...`);
-
-      // Split into chunks
-      const textChunks = chunkText(content.extractedText, 500, 50);
+      const textChunks = chunkText(extractedText, 500, 50);
 
       if (textChunks.length === 0) {
-        throw new Error("Could not create chunks from text");
+        throw new Error("Could not create chunks");
       }
 
-      // Get embeddings from Open Router
       const embeddings = await getEmbeddings(textChunks);
 
-      // Create chunk objects with embeddings
       const chunksWithEmbeddings = textChunks.map((text, index) => ({
         _id: new mongoose.Types.ObjectId(),
         text: text,
@@ -203,7 +219,6 @@ async function processContentInBackground(
         embedding: embeddings[index],
       }));
 
-      // Store embeddings
       await Content.findByIdAndUpdate(contentId, {
         chunks: chunksWithEmbeddings,
         embeddingStatus: "embedded",
@@ -211,25 +226,18 @@ async function processContentInBackground(
         embeddingError: null,
       });
 
-      console.log(
-        `✓ Embedding complete for ${contentId} (${chunksWithEmbeddings.length} chunks)`,
-      );
-    } catch (embeddingError) {
-      console.error(`✗ Embedding failed for ${contentId}:`, embeddingError);
+      console.log(`[EMBED] ✓ Created ${chunksWithEmbeddings.length} chunks`);
+    } catch (embeddingError: any) {
+      console.error("[EMBED] ❌ Failed:", embeddingError.message);
       await Content.findByIdAndUpdate(contentId, {
         embeddingStatus: "failed",
-        embeddingError:
-          embeddingError instanceof Error
-            ? embeddingError.message
-            : "Unknown error",
+        embeddingError: embeddingError.message,
       });
       return;
     }
 
-    console.log(`✓✓ Fully processed ${contentId} successfully!`);
-  } catch (error) {
-    console.error(`Unexpected error in background processing:`, error);
+    console.log(`[PROCESS] ✓✓ Fully processed ${contentId} successfully!`);
+  } catch (error: any) {
+    console.error("[PROCESS] ❌ Unexpected error:", error.message);
   }
 }
-
-export { addContent, getContent, deleteContent };
