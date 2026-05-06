@@ -21,14 +21,10 @@ exports.SigninSchema = zod_1.z.object({
 });
 // Add content schema
 exports.AddContentSchema = zod_1.z.object({
-    link: zod_1.z.string().url("Invalid URL").optional(),
-    type: zod_1.z.enum(["article", "tweet", "pdf", "text", "youtube"], {
-        message: "Type must be one of: article, tweet, pdf, text, youtube",
-    }),
-    title: zod_1.z
-        .string()
-        .min(1, "Title is required")
-        .max(200, "Title must be at most 200 characters"),
+    link: zod_1.z.string().url().optional(), // For URLs
+    file: zod_1.z.instanceof(File).optional(), // For PDF file upload
+    type: zod_1.z.enum(["article", "tweet", "pdf", "youtube", "text"]),
+    title: zod_1.z.string().min(1).max(200),
     tags: zod_1.z.array(zod_1.z.string()).optional(),
 });
 // Chat schema

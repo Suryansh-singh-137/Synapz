@@ -22,11 +22,12 @@ const autht_1 = require("./controller/autht");
 const content_1 = require("./controller/content");
 const authmid_1 = require("./middleware/authmid");
 const generateLink_1 = require("./controller/generateLink");
-const chatController_1 = require("./controller/chatController"); // ✅ ADD THIS
+const chatController_1 = require("./controller/chatController");
 const extractController_1 = require("./controller/extractController");
 const Schema_1 = require("./models/Schema");
-// ✅ IMPORT VALIDATION SCHEMAS AND MIDDLEWARE
+// ✅ IMPORT VALIDATION AND FILE UPLOAD
 const validation_1 = require("./utils/validation");
+const fileUpload_1 = require("./utils/fileUpload");
 // ============ DATABASE ============
 const MONGO_URL = process.env.MONGO_URL;
 const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
@@ -47,39 +48,30 @@ app.get("/api/v1/test", (req, res) => {
     res.json({ message: "Hello World" });
 });
 // ============ AUTHENTICATION ROUTES ============
-// ✅ WITH VALIDATION
 app.post("/api/v1/signin", (0, validation_1.validateRequest)(validation_1.SigninSchema), autht_1.signin);
 app.post("/api/v1/signup", (0, validation_1.validateRequest)(validation_1.SignupSchema), autht_1.signup);
 // ============ CONTENT ROUTES ============
-// ✅ WITH VALIDATION
-app.post("/api/v1/content", authmid_1.userMiddleware, (0, validation_1.validateRequest)(validation_1.AddContentSchema), content_1.addContent);
+// Add content (with optional file upload for PDFs)
+app.post("/api/v1/content", authmid_1.userMiddleware, fileUpload_1.upload.single("file"), // Handle single file upload
+(0, validation_1.validateRequest)(validation_1.AddContentSchema), content_1.addContent);
 app.get("/api/v1/content", authmid_1.userMiddleware, content_1.getContent);
 app.delete("/api/v1/content", authmid_1.userMiddleware, (0, validation_1.validateRequest)(validation_1.DeleteContentSchema), content_1.deleteContent);
+// ✅ FILE UPLOAD ENDPOINT (optional alternative)
+app.post("/api/v1/upload-pdf", authmid_1.userMiddleware, fileUpload_1.upload.single("file"), fileUpload_1.uploadPdfFile);
 // ============ BRAIN ROUTES ============
-// Extract text from a single piece of content
 app.post("/api/v1/brain/extract", authmid_1.userMiddleware, extractController_1.extractContent);
-// Extract text from ALL user's pending content
 app.post("/api/v1/brain/extract-all", authmid_1.userMiddleware, extractController_1.extractAllContent);
-// ✅ CHAT ENDPOINT WITH VALIDATION
 app.post("/api/v1/brain/chat", authmid_1.userMiddleware, (0, validation_1.validateRequest)(validation_1.ChatSchema), chatController_1.chatWithBrain);
-// Share brain
 app.post("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.genrateLink);
 // ============ PUBLIC ROUTES ============
-// View shared brain (no auth needed)
 app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const hash = req.params.shareLink;
-    const link = yield Schema_1.Link.findOne({
-        hash: hash,
-    });
+    const link = yield Schema_1.Link.findOne({ hash: hash });
     if (!link) {
         return res.status(404).json({ message: "Link not found" });
     }
-    const content = yield Schema_1.Content.find({
-        userId: link.userId,
-    });
-    const user = yield Schema_1.User.findOne({
-        _id: link.userId,
-    });
+    const content = yield Schema_1.Content.find({ userId: link.userId });
+    const user = yield Schema_1.User.findOne({ _id: link.userId });
     if (!user) {
         return res.status(411).json({ message: "User not found" });
     }
@@ -88,8 +80,17 @@ app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void
         content: content,
     });
 }));
+// ============ ERROR HANDLING ============
+app.use((err, req, res, next) => {
+    console.error("Error:", err.message);
+    res.status(500).json({
+        message: "Server error",
+        error: err.message,
+    });
+});
 // ============ SERVER ============
-app.listen(3000, () => {
-    console.log("Server is running on port 3000");
+const PORT = 3001;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
 exports.default = app;
