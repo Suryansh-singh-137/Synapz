@@ -1,12 +1,50 @@
 @import "tailwindcss";
 
 /* =========================================
+   TAILWIND v4 THEME TOKENS
+========================================= */
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-surface: hsl(var(--surface));
+  --color-surface-foreground: hsl(var(--surface-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-ink: hsl(var(--ink));
+  --color-ink-foreground: hsl(var(--ink-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+}
+
+/* =========================================
    SYNAPZ — Brutalist Monochrome Design System
 ========================================= */
 
 @layer base {
   :root {
-    /* Light Theme */
+    /* LIGHT THEME */
+
     --background: 0 0% 98%;
     --foreground: 0 0% 8%;
 
@@ -30,6 +68,11 @@
 
     --accent: 0 0% 90%;
     --accent-foreground: 0 0% 8%;
+
+    /* IMPORTANT — FIX FOR LOVABLE COMPONENTS */
+
+    --ink: 0 0% 6%;
+    --ink-foreground: 0 0% 98%;
 
     --border: 0 0% 85%;
     --input: 0 0% 92%;
@@ -62,6 +105,11 @@
 
     --accent: 0 0% 24%;
     --accent-foreground: 0 0% 96%;
+
+    /* IMPORTANT — FIX FOR LOVABLE COMPONENTS */
+
+    --ink: 0 0% 96%;
+    --ink-foreground: 0 0% 6%;
 
     --border: 0 0% 20%;
     --input: 0 0% 20%;
@@ -298,7 +346,7 @@
 }
 
 /* =========================================
-   SELECTION
+   TEXT SELECTION
 ========================================= */
 
 ::selection {
