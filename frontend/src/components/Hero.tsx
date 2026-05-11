@@ -18,7 +18,7 @@ export const Hero = () => {
 
             <div className="mt-12">
               <Link
-                href="/auth/signup"
+                href="/signup"
                 className="inline-flex items-center gap-3 border border-ink bg-background px-8 py-4 font-mono-tech text-xs uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ink-foreground"
               >
                 Get Started

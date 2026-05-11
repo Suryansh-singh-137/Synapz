@@ -142,10 +142,7 @@ export default function SignupForm() {
       {/* Login Link */}
       <p className="text-sm text-center text-foreground">
         Already have an account?{" "}
-        <Link
-          href="/auth/login"
-          className="text-ink hover:underline font-medium"
-        >
+        <Link href="/login" className="text-ink hover:underline font-medium">
           Login
         </Link>
       </p>
