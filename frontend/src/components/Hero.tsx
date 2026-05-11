@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { NeuralOrb } from "@/components/NeuralOrb";
 
 export const Hero = () => {
@@ -16,13 +17,13 @@ export const Hero = () => {
             </p>
 
             <div className="mt-12">
-              <a
-                href="#signup"
+              <Link
+                href="/auth/signup"
                 className="inline-flex items-center gap-3 border border-ink bg-background px-8 py-4 font-mono-tech text-xs uppercase tracking-[0.25em] text-ink transition-colors hover:bg-ink hover:text-ink-foreground"
               >
                 Get Started
                 <span>→</span>
-              </a>
+              </Link>
             </div>
           </div>
 
