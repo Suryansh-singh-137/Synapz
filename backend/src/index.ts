@@ -2,6 +2,7 @@ import express from "express";
 const app = express();
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import cors from "cors";
 
 dotenv.config();
 
@@ -44,6 +45,12 @@ connectToDatabase();
 
 // ============ MIDDLEWARE ============
 app.use(express.json());
+app.use(
+  cors({
+    origin: ["http://localhost:3000", "http://localhost:3001"],
+    credentials: true,
+  }),
+);
 
 // ============ HEALTH CHECK ============
 console.log("Registering /api/v1/test route");
@@ -129,7 +136,7 @@ app.use((err: any, req: any, res: any, next: any) => {
 
 // ============ SERVER ============
 
-const PORT = 3001;
+const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

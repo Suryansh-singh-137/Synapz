@@ -16,6 +16,7 @@ const express_1 = __importDefault(require("express"));
 const app = (0, express_1.default)();
 const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const cors_1 = __importDefault(require("cors"));
 dotenv_1.default.config();
 // ============ IMPORTS ============
 const autht_1 = require("./controller/autht");
@@ -42,6 +43,10 @@ const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
 connectToDatabase();
 // ============ MIDDLEWARE ============
 app.use(express_1.default.json());
+app.use((0, cors_1.default)({
+    origin: ["http://localhost:3000", "http://localhost:3001"],
+    credentials: true,
+}));
 // ============ HEALTH CHECK ============
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
@@ -89,7 +94,7 @@ app.use((err, req, res, next) => {
     });
 });
 // ============ SERVER ============
-const PORT = 3001;
+const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
