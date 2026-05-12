@@ -44,7 +44,7 @@ connectToDatabase();
 // ============ MIDDLEWARE ============
 app.use(express_1.default.json());
 app.use((0, cors_1.default)({
-    origin: ["http://localhost:3000", "http://localhost:3001"],
+    origin: ["http://localhost:3000"],
     credentials: true,
 }));
 // ============ HEALTH CHECK ============
@@ -94,7 +94,7 @@ app.use((err, req, res, next) => {
     });
 });
 // ============ SERVER ============
-const PORT = 3000;
+const PORT = 5000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
