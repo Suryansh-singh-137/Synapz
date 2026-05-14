@@ -1,32 +1,30 @@
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api/v1";
-function getToken() {
-  return localStorage.getItem("token");
-}
-//  for fetching all the content
+const API_URL = process.env.REACT_APP_API_URL 
+
+
+const getToken = () => localStorage.getItem('token');
+
 export async function fetchContent() {
   const res = await fetch(`${API_URL}/content`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  if (!res.ok) {
-    throw new Error("Failed to fetch content");
-  }
+  if (!res.ok) throw new Error('Failed to fetch content');
   return res.json();
 }
-// adding content
-export async function createContent(data) {
+
+export async function addContentAPI(data) {
   const res = await fetch(`${API_URL}/content`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       Authorization: `Bearer ${getToken()}`,
     },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to add content");
+  if (!res.ok) throw new Error('Failed to add content');
   return res.json();
 }
-//  deleteing content
-export async function removeContent(contentId) {
+
+export async function deleteContentAPI(contentId) {
   const res = await fetch(`${API_URL}/content`, {
     method: 'DELETE',
     headers: {
@@ -35,13 +33,12 @@ export async function removeContent(contentId) {
     },
     body: JSON.stringify({ contentId }),
   });
-  if (!res.ok) throw new Error('Failed to delete content');
+  if (!res.ok) throw new Error('Failed to delete');
   return res.json();
 }
-//  post method to chat with the brain 
- export async function  chatAPI(query)
-{
-  const res  =  await fetch(`${API_URL}/brain/chat`, {
+
+export async function chatAPI(query) {
+  const res = await fetch(`${API_URL}/brain/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -49,15 +46,15 @@ export async function removeContent(contentId) {
     },
     body: JSON.stringify({ query }),
   });
-  if (!res.ok) throw new Error('Failed to chat with brain');
+  if (!res.ok) throw new Error('Chat failed');
   return res.json();
 }
-// post method for shareable  brain link 
-export async function createShareLink() {
+
+export async function createShareLinkAPI() {
   const res = await fetch(`${API_URL}/brain/share`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  if (!res.ok) throw new Error('Failed to create share link');
+  if (!res.ok) throw new Error('Failed to create link');
   return res.json();
 }
