@@ -18,7 +18,7 @@ export const useShareStore = create((set) => ({
       const shareLink = `${window.location.origin}/brain/${response.hash}`;
       set({ link: shareLink });
       return shareLink;
-    } catch (err) {
+    } catch (err: any) {
       set({ error: err.message });
       return null;
     } finally {
