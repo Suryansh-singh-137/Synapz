@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
+import { removeToken } from "@/lib/authHelpers";
 import AddContentModal from "./AddContentModal";
 import ShareModal from "./ShareModal";
 
@@ -18,58 +19,69 @@ export default function DashboardLayout({ children }: Props) {
   const [showShare, setShowShare] = useState(false);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    // Clear everything
+    removeToken();
     logout();
     router.push("/login");
   };
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen">
       {/* Sidebar */}
-      <aside className="w-48 border-right min-h-screen p-6">
-        <h2 className="text-xl font-bold mb-8">SYNAPZ</h2>
+      <aside className="w-48 border-right border-all min-h-screen p-6 bg-background">
+        {/* Logo */}
+        <h2 className="text-xl font-bold mb-12">SYNAPZ</h2>
 
-        <nav className="space-y-4 mb-8">
-          <Link href="/dashboard" className="block hover:opacity-60">
-            Home
+        {/* Navigation */}
+        <nav className="space-y-4 mb-12">
+          <Link href="/dashboard" className="block hover:opacity-60 transition">
+            🏠 Home
           </Link>
-          <Link href="/dashboard/content" className="block hover:opacity-60">
-            Content
+          <Link
+            href="/dashboard/content"
+            className="block hover:opacity-60 transition"
+          >
+            📚 Content
           </Link>
-          <Link href="/dashboard/chat" className="block hover:opacity-60">
-            Chat
+          <Link
+            href="/dashboard/chat"
+            className="block hover:opacity-60 transition"
+          >
+            💬 Chat
           </Link>
         </nav>
 
         <hr className="mb-8" />
 
-        <div className="space-y-4">
+        {/* Action Buttons */}
+        <div className="space-y-4 mb-8">
           <button
             onClick={() => setShowAddContent(true)}
-            className="w-full btn-brutalist-outline"
+            className="w-full btn-brutalist-outline text-sm"
           >
-            + Add
+            + Add Content
           </button>
           <button
             onClick={() => setShowShare(true)}
-            className="w-full btn-brutalist-outline"
+            className="w-full btn-brutalist-outline text-sm"
           >
-            Share
+            🔗 Share Brain
           </button>
         </div>
 
-        <hr className="my-8" />
+        <hr className="mb-8" />
 
+        {/* Logout */}
         <button
           onClick={handleLogout}
-          className="w-full btn-brutalist-outline text-red-600 border-red-300"
+          className="w-full btn-brutalist-outline text-sm text-red-600 border-red-300 hover:bg-red-50"
         >
           Logout
         </button>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1">{children}</main>
+      <main className="flex-1 bg-background">{children}</main>
 
       {/* Modals */}
       <AddContentModal
