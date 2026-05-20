@@ -38,8 +38,17 @@ function extractTextFromUrl(url) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             console.log(`[EXTRACT] Using Jina Reader for: ${url}`);
-            // Simple: encode the URL so special characters don't break the Jina endpoint
-            const jinaUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
+            // Normalize the URL: decode any existing percent-encoding then encode once.
+            // This prevents double-encoding like `%` -> `%25` which broke Jina requests.
+            let normalizedUrl = url;
+            try {
+                normalizedUrl = decodeURI(url);
+            }
+            catch (e) {
+                // If decodeURI throws (malformed), fall back to the original URL
+                normalizedUrl = url;
+            }
+            const jinaUrl = `https://r.jina.ai/${encodeURI(normalizedUrl)}`;
             console.log(`[EXTRACT] Jina URL: ${jinaUrl}`);
             const response = yield axios_1.default.get(jinaUrl, {
                 headers: {
@@ -55,7 +64,26 @@ function extractTextFromUrl(url) {
             return text;
         }
         catch (error) {
-            const msg = error.message || "Unknown error";
+            let msg = error.message || "Unknown error";
+            // If Axios provided a response, log useful debugging info from Jina
+            if (error === null || error === void 0 ? void 0 : error.response) {
+                try {
+                    console.error("[EXTRACT] Jina response status:", error.response.status);
+                    console.error("[EXTRACT] Jina response headers:", error.response.headers);
+                    console.error("[EXTRACT] Jina response body:", error.response.data);
+                    msg = `Jina ${error.response.status}: ${typeof error.response.data === "string"
+                        ? error.response.data
+                        : JSON.stringify(error.response.data)}`;
+                }
+                catch (logErr) {
+                    console.error("[EXTRACT] Failed to log Jina response:", logErr);
+                }
+            }
+            else if (error === null || error === void 0 ? void 0 : error.request) {
+                // request was made but no response
+                console.error("[EXTRACT] No response from Jina. Request info:", error.request);
+                msg = "No response from Jina";
+            }
             console.error(`[EXTRACT] ✗ Failed: ${msg}`);
             throw new Error(`Failed to extract from URL: ${msg}`);
         }
