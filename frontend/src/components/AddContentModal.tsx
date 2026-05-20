@@ -11,22 +11,43 @@ export const AddContentModal = ({ isOpen, onClose }: Props) => {
 
   const [type, setType] = useState("article");
   const [link, setLink] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [tags, setTags] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const success = await addContent({
-      type,
-      link,
-      title,
-      tags: tags ? tags.split(",").map((t) => t.trim()) : [],
-    });
+    const tagList = tags
+      ? tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+
+    const payload =
+      type === "pdf"
+        ? (() => {
+            const formData = new FormData();
+            formData.append("type", type);
+            formData.append("title", title);
+            if (file) formData.append("file", file);
+            tagList.forEach((tag) => formData.append("tags", tag));
+            return formData;
+          })()
+        : {
+            type,
+            link,
+            title,
+            tags: tagList,
+          };
+
+    const success = await addContent(payload);
 
     if (success) {
       setType("article");
       setLink("");
+      setFile(null);
       setTitle("");
       setTags("");
       onClose();
@@ -66,7 +87,13 @@ export const AddContentModal = ({ isOpen, onClose }: Props) => {
           <Field label="Type">
             <select
               value={type}
-              onChange={(e) => setType(e.target.value)}
+              onChange={(e) => {
+                setType(e.target.value);
+                setFile(null);
+                if (e.target.value !== "pdf") {
+                  setLink("");
+                }
+              }}
               className="w-full border border-ink bg-background px-4 py-2 font-mono-tech text-xs uppercase tracking-[0.15em] focus:outline-none"
             >
               <option value="article">article</option>
@@ -77,14 +104,26 @@ export const AddContentModal = ({ isOpen, onClose }: Props) => {
           </Field>
 
           <Field label={type === "pdf" ? "Upload PDF" : "Link"}>
-            <input
-              type={type === "pdf" ? "file" : "url"}
-              value={type === "pdf" ? "" : link}
-              onChange={(e) => setLink(e.target.value)}
-              className="w-full border border-ink bg-background px-4 py-2 font-mono-tech text-xs focus:outline-none"
-              placeholder="https://example.com/article"
-              required
-            />
+            {type === "pdf" ? (
+              <input
+                key={type}
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                className="w-full border border-ink bg-background px-4 py-2 font-mono-tech text-xs focus:outline-none"
+                required
+              />
+            ) : (
+              <input
+                key={type}
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                className="w-full border border-ink bg-background px-4 py-2 font-mono-tech text-xs focus:outline-none"
+                placeholder="https://example.com/article"
+                required
+              />
+            )}
           </Field>
 
           <Field label="Title">

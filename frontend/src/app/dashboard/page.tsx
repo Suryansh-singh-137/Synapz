@@ -2,18 +2,42 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useContentStore } from "@/store/contentStore";
 
 export default function DashboardHome() {
-  const { user } = useAuthStore();
+  const { user, token, setToken } = useAuthStore();
   const { content, loadContent } = useContentStore() as any;
+  const router = useRouter();
 
+  // Rehydrate token from localStorage if store is empty
   useEffect(() => {
-    loadContent();
-  }, [loadContent]);
+    if (!token) {
+      const t =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (t) {
+        setToken(t);
+        return;
+      }
+      router.push("/login");
+    }
+  }, [token, router, setToken]);
 
-  if (!user) return <div className="p-8">Loading...</div>;
+  // Load content once token is present
+  useEffect(() => {
+    if (token) {
+      loadContent();
+    }
+  }, [token, loadContent]);
+
+  // If there's no user and no token in store AND no token in localStorage,
+  // show Loading. If a token exists in localStorage we assume the app is
+  // rehydrating and avoid the Loading flash while effects run.
+  const hasLocalToken =
+    typeof window !== "undefined" && !!localStorage.getItem("token");
+  if (!user && !token && !hasLocalToken)
+    return <div className="p-8">Loading...</div>;
 
   const recent = content.slice(0, 4);
 
@@ -24,7 +48,7 @@ export default function DashboardHome() {
           DASH_001 / HOME
         </p>
         <h2 className="font-display text-4xl md:text-5xl text-ink leading-none">
-          Welcome back, {user.username}
+          Welcome back, {user?.username || "there"}!
         </h2>
         <p className="text-muted-foreground mt-3">
           You have {content.length} items in your brain

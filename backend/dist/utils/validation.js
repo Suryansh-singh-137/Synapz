@@ -27,7 +27,27 @@ exports.AddContentSchema = zod_1.z.object({
     file: zod_1.z.any().optional(), // For PDF file upload (handled by multer)
     type: zod_1.z.enum(["article", "tweet", "pdf", "youtube", "text"]),
     title: zod_1.z.string().min(1).max(200),
-    tags: zod_1.z.array(zod_1.z.string()).optional(),
+    tags: zod_1.z.preprocess((val) => {
+        if (typeof val === "string") {
+            try {
+                const parsed = JSON.parse(val);
+                if (Array.isArray(parsed)) {
+                    return parsed.map((item) => String(item).trim()).filter(Boolean);
+                }
+            }
+            catch (_a) {
+                // ignore parse error, fall back to comma splitting
+            }
+            return val
+                .split(",")
+                .map((tag) => tag.trim())
+                .filter(Boolean);
+        }
+        if (Array.isArray(val)) {
+            return val.map((tag) => String(tag).trim()).filter(Boolean);
+        }
+        return undefined;
+    }, zod_1.z.array(zod_1.z.string()).optional()),
 });
 // Chat schema
 exports.ChatSchema = zod_1.z.object({

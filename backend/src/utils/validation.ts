@@ -28,7 +28,27 @@ export const AddContentSchema = z.object({
   file: z.any().optional(), // For PDF file upload (handled by multer)
   type: z.enum(["article", "tweet", "pdf", "youtube", "text"]),
   title: z.string().min(1).max(200),
-  tags: z.array(z.string()).optional(),
+  tags: z.preprocess((val) => {
+    if (typeof val === "string") {
+      try {
+        const parsed = JSON.parse(val);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        }
+      } catch {
+        // ignore parse error, fall back to comma splitting
+      }
+
+      return val
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    }
+    if (Array.isArray(val)) {
+      return val.map((tag) => String(tag).trim()).filter(Boolean);
+    }
+    return undefined;
+  }, z.array(z.string()).optional()),
 });
 // Chat schema
 export const ChatSchema = z.object({

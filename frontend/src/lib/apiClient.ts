@@ -4,28 +4,59 @@ const API_URL =
 const getToken = () => localStorage.getItem("token");
 
 export async function fetchContent() {
-  const res = await fetch(`${API_URL}/content`, {
+  const url = `${API_URL}/content`;
+  // eslint-disable-next-line no-console
+  console.log("fetchContent ->", url);
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  if (!res.ok) throw new Error("Failed to fetch content");
+  if (!res.ok) {
+    // eslint-disable-next-line no-console
+    console.error("fetchContent failed status:", res.status);
+    throw new Error("Failed to fetch content");
+  }
   return res.json();
 }
 
 export async function addContentAPI(data: any) {
-  const res = await fetch(`${API_URL}/content`, {
+  const url = `${API_URL}/content`;
+  // eslint-disable-next-line no-console
+  console.log("addContent ->", url, data);
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${getToken()}`,
+  };
+
+  const body = data instanceof FormData ? data : JSON.stringify(data);
+
+  if (!(data instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-    },
-    body: JSON.stringify(data),
+    headers,
+    body,
   });
-  if (!res.ok) throw new Error("Failed to add content");
+  if (!res.ok) {
+    const errorText = await res.text();
+    // eslint-disable-next-line no-console
+    console.error(
+      "addContentAPI response status:",
+      res.status,
+      "body:",
+      errorText,
+    );
+    throw new Error(`Failed to add content: ${errorText}`);
+  }
   return res.json();
 }
 
 export async function deleteContentAPI(contentId: string) {
-  const res = await fetch(`${API_URL}/content`, {
+  const url = `${API_URL}/content`;
+  // eslint-disable-next-line no-console
+  console.log("deleteContent ->", url, contentId);
+  const res = await fetch(url, {
     method: "DELETE",
     headers: {
       "Content-Type": "application/json",
@@ -33,7 +64,11 @@ export async function deleteContentAPI(contentId: string) {
     },
     body: JSON.stringify({ contentId }),
   });
-  if (!res.ok) throw new Error("Failed to delete");
+  if (!res.ok) {
+    // eslint-disable-next-line no-console
+    console.error("deleteContentAPI response status:", res.status);
+    throw new Error("Failed to delete");
+  }
   return res.json();
 }
 

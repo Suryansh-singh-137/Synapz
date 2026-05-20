@@ -38,8 +38,9 @@ function extractTextFromUrl(url) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             console.log(`[EXTRACT] Using Jina Reader for: ${url}`);
-            // Simple: just prepend Jina reader endpoint
-            const jinaUrl = `https://r.jina.ai/${url}`;
+            // Simple: encode the URL so special characters don't break the Jina endpoint
+            const jinaUrl = `https://r.jina.ai/${encodeURIComponent(url)}`;
+            console.log(`[EXTRACT] Jina URL: ${jinaUrl}`);
             const response = yield axios_1.default.get(jinaUrl, {
                 headers: {
                     Accept: "text/plain",
