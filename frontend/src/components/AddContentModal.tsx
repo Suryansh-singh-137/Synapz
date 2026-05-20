@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { useContentStore } from "@/store/contentStore";
 
@@ -8,36 +6,29 @@ interface Props {
   onClose: () => void;
 }
 
-export default function AddContentModal({ isOpen, onClose }: Props) {
-  const { addContent, loading, error, clearError } = useContentStore() as {
-    addContent: (data: {
-      type: string;
-      link: string;
-      title: string;
-      tags: string[];
-    }) => Promise<boolean>;
-    loading: boolean;
-    error: string;
-    clearError: () => void;
-  };
+export const AddContentModal = ({ isOpen, onClose }: Props) => {
+  const { addContent, loading, error, clearError } = useContentStore() as any;
 
-  const [form, setForm] = useState({
-    type: "article",
-    link: "",
-    title: "",
-    tags: "",
-  });
+  const [type, setType] = useState("article");
+  const [link, setLink] = useState("");
+  const [title, setTitle] = useState("");
+  const [tags, setTags] = useState("");
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const success = await addContent({
-      ...form,
-      tags: form.tags ? form.tags.split(",").map((t) => t.trim()) : [],
+      type,
+      link,
+      title,
+      tags: tags ? tags.split(",").map((t) => t.trim()) : [],
     });
 
     if (success) {
-      setForm({ type: "article", link: "", title: "", tags: "" });
+      setType("article");
+      setLink("");
+      setTitle("");
+      setTags("");
       onClose();
     }
   };
@@ -45,85 +36,90 @@ export default function AddContentModal({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-background border-all max-w-md w-full p-8">
-        <h2 className="text-2xl font-bold mb-6">Add Content</h2>
+    <div
+      className="fixed inset-0 z-50 bg-ink/60 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background border border-ink max-w-md w-full p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="font-display text-2xl text-ink">Add Content</h2>
+          <span className="font-mono-tech text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+            MOD_001
+          </span>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Type</label>
+        {error && (
+          <div className="mb-4 p-3 border border-red-300 bg-red-50 text-red-600 text-sm">
+            <div className="flex justify-between items-start">
+              <span>{error}</span>
+              <button onClick={clearError} className="text-xs hover:opacity-60">
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Field label="Type">
             <select
-              value={form.type}
-              onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
-              className="w-full border-all px-4 py-2"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="w-full border border-ink bg-background px-4 py-2 font-mono-tech text-xs uppercase tracking-[0.15em] focus:outline-none"
             >
-              <option value="article">Article</option>
-              <option value="youtube">YouTube</option>
-              <option value="pdf">PDF</option>
-              <option value="tweet">Tweet</option>
+              <option value="article">article</option>
+              <option value="youtube">youtube</option>
+              <option value="pdf">pdf</option>
+              <option value="tweet">tweet</option>
             </select>
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Link</label>
+          <Field label={type === "pdf" ? "Upload PDF" : "Link"}>
             <input
-              type="url"
-              value={form.link}
-              onChange={(e) => setForm((p) => ({ ...p, link: e.target.value }))}
-              className="w-full border-all px-4 py-2"
+              type={type === "pdf" ? "file" : "url"}
+              value={type === "pdf" ? "" : link}
+              onChange={(e) => setLink(e.target.value)}
+              className="w-full border border-ink bg-background px-4 py-2 font-mono-tech text-xs focus:outline-none"
+              placeholder="https://example.com/article"
               required
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Title</label>
+          <Field label="Title">
             <input
               type="text"
-              value={form.title}
-              onChange={(e) =>
-                setForm((p) => ({ ...p, title: e.target.value }))
-              }
-              className="w-full border-all px-4 py-2"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border border-ink bg-background px-4 py-2 text-sm focus:outline-none"
+              placeholder="Enter title"
               required
             />
-          </div>
+          </Field>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Tags</label>
+          <Field label="Tags">
             <input
               type="text"
-              value={form.tags}
-              onChange={(e) => setForm((p) => ({ ...p, tags: e.target.value }))}
-              className="w-full border-all px-4 py-2"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className="w-full border border-ink bg-background px-4 py-2 text-sm focus:outline-none"
               placeholder="ai, learning, tech"
             />
-          </div>
+          </Field>
 
-          {error && (
-            <p className="text-red-600 text-sm">
-              {error}
-              <button
-                type="button"
-                onClick={clearError}
-                className="ml-2 text-xs hover:opacity-60"
-              >
-                Dismiss
-              </button>
-            </p>
-          )}
-
-          <div className="flex gap-4 pt-4">
+          <div className="flex gap-3 mt-8">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border-all px-4 py-2"
+              className="flex-1 border border-ink bg-background px-4 py-2.5 font-mono-tech text-[11px] uppercase tracking-[0.2em] hover:bg-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 btn-brutalist"
+              className="flex-1 border border-ink bg-ink px-4 py-2.5 font-mono-tech text-[11px] uppercase tracking-[0.2em] text-ink-foreground hover:bg-background hover:text-ink disabled:opacity-50"
             >
               {loading ? "Adding..." : "Add Content"}
             </button>
@@ -132,4 +128,19 @@ export default function AddContentModal({ isOpen, onClose }: Props) {
       </div>
     </div>
   );
-}
+};
+
+const Field = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div>
+    <label className="block font-mono-tech text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-2">
+      {label}
+    </label>
+    {children}
+  </div>
+);

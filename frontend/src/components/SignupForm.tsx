@@ -59,7 +59,15 @@ export default function SignupForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        setApiError(data.error || "Signup failed");
+        console.error("Signup failed", response.status, data);
+        setApiError(data.error || data.message || "Signup failed");
+        setLoading(false);
+        return;
+      }
+
+      if (!data.token) {
+        console.error("Signup succeeded but no token returned", data);
+        setApiError("Signup succeeded but the server did not return a token.");
         setLoading(false);
         return;
       }

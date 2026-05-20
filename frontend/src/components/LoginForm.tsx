@@ -54,7 +54,17 @@ export default function LoginForm() {
       const data = await response.json();
 
       if (!response.ok) {
-        setApiError(data.error || "Invalid username or password");
+        console.error("Login failed", response.status, data);
+        setApiError(
+          data.error || data.message || "Invalid username or password",
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (!data.token) {
+        console.error("Login succeeded but no token returned", data);
+        setApiError("Login succeeded but the server did not return a token.");
         setLoading(false);
         return;
       }

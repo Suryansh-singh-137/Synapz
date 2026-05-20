@@ -32,8 +32,10 @@ const signup = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             username: username,
             password: hashed,
         });
+        const token = jsonwebtoken_1.default.sign({ userId: user._id }, process.env.JWT_SECRET);
         res.status(200).json({
             message: "User created successfully",
+            token,
         });
     }
     catch (e) {
