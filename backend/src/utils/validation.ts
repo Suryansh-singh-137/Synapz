@@ -23,7 +23,9 @@ export const SigninSchema = z.object({
 // Add content schema
 export const AddContentSchema = z.object({
   link: z.string().url().optional(), // For URLs
-  file: z.instanceof(File).optional(), // For PDF file upload
+  // `File` is a browser API and not available in Node; multer attaches uploaded files
+  // as `req.file`. Validate file server-side via multer, not with `z.instanceof(File)`.
+  file: z.any().optional(), // For PDF file upload (handled by multer)
   type: z.enum(["article", "tweet", "pdf", "youtube", "text"]),
   title: z.string().min(1).max(200),
   tags: z.array(z.string()).optional(),

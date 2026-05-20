@@ -1,60 +1,60 @@
-const API_URL = process.env.REACT_APP_API_URL 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
 
-
-const getToken = () => localStorage.getItem('token');
+const getToken = () => localStorage.getItem("token");
 
 export async function fetchContent() {
   const res = await fetch(`${API_URL}/content`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  if (!res.ok) throw new Error('Failed to fetch content');
+  if (!res.ok) throw new Error("Failed to fetch content");
   return res.json();
 }
 
-export async function addContentAPI(data) {
+export async function addContentAPI(data: any) {
   const res = await fetch(`${API_URL}/content`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
     },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error('Failed to add content');
+  if (!res.ok) throw new Error("Failed to add content");
   return res.json();
 }
 
-export async function deleteContentAPI(contentId) {
+export async function deleteContentAPI(contentId: string) {
   const res = await fetch(`${API_URL}/content`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
     },
     body: JSON.stringify({ contentId }),
   });
-  if (!res.ok) throw new Error('Failed to delete');
+  if (!res.ok) throw new Error("Failed to delete");
   return res.json();
 }
 
-export async function chatAPI(query) {
+export async function chatAPI(query: string) {
   const res = await fetch(`${API_URL}/brain/chat`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${getToken()}`,
     },
     body: JSON.stringify({ query }),
   });
-  if (!res.ok) throw new Error('Chat failed');
+  if (!res.ok) throw new Error("Chat failed");
   return res.json();
 }
 
 export async function createShareLinkAPI() {
   const res = await fetch(`${API_URL}/brain/share`, {
-    method: 'POST',
+    method: "POST",
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  if (!res.ok) throw new Error('Failed to create link');
+  if (!res.ok) throw new Error("Failed to create link");
   return res.json();
 }

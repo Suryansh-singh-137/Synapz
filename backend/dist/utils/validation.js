@@ -22,7 +22,9 @@ exports.SigninSchema = zod_1.z.object({
 // Add content schema
 exports.AddContentSchema = zod_1.z.object({
     link: zod_1.z.string().url().optional(), // For URLs
-    file: zod_1.z.instanceof(File).optional(), // For PDF file upload
+    // `File` is a browser API and not available in Node; multer attaches uploaded files
+    // as `req.file`. Validate file server-side via multer, not with `z.instanceof(File)`.
+    file: zod_1.z.any().optional(), // For PDF file upload (handled by multer)
     type: zod_1.z.enum(["article", "tweet", "pdf", "youtube", "text"]),
     title: zod_1.z.string().min(1).max(200),
     tags: zod_1.z.array(zod_1.z.string()).optional(),

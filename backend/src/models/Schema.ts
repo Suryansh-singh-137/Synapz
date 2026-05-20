@@ -31,7 +31,7 @@ const ContentSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["twitter", "youtube", "article", "pdf", "text"],
+    enum: ["tweet", "youtube", "article", "pdf", "text"],
     required: true,
   },
   title: {
