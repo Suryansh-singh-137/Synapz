@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { Content } from "../models/Schema";
 import { extractTextFromUrl, chunkText } from "../utils/extractText";
+import { extractTextFromPdf } from "../utils/extractPdf"; // ← NEW: PDF pipeline
 import { getEmbeddings } from "../utils/embeddings";
 import { uploadPdfToCloudinary } from "../utils/fileUpload";
 import mongoose from "mongoose";
@@ -16,23 +17,19 @@ export const addContent = async (req: Request, res: Response) => {
 
     console.log(`[CONTENT] Adding ${type}: ${title}`);
 
-    // Validate required fields
     if (!type || !title) {
-      return res.status(400).json({
-        message: "type and title are required",
-      });
+      return res.status(400).json({ message: "type and title are required" });
     }
 
     let finalLink = link;
 
-    // Handle PDF file upload
+    // Handle PDF file upload → get back a Cloudinary URL
     if (type === "pdf" && req.file) {
       console.log("[CONTENT] Uploading PDF to Cloudinary...");
       finalLink = await uploadPdfToCloudinary(req.file.path);
       console.log(`[CONTENT] PDF URL: ${finalLink}`);
     }
 
-    // If type is PDF or link-based, must have link
     if (
       (type === "pdf" ||
         type === "article" ||
@@ -40,12 +37,11 @@ export const addContent = async (req: Request, res: Response) => {
         type === "tweet") &&
       !finalLink
     ) {
-      return res.status(400).json({
-        message: `${type} requires a link`,
-      });
+      return res
+        .status(400)
+        .json({ message: `${type} requires a link or uploaded file` });
     }
 
-    // Create content document
     const content = await Content.create({
       link: finalLink,
       type,
@@ -56,14 +52,14 @@ export const addContent = async (req: Request, res: Response) => {
       embeddingStatus: "pending",
     });
 
-    // Return immediately
+    // Respond immediately — don't make the user wait for extraction
     res.status(200).json({
       message: "Content added successfully. Processing in background...",
       contentId: content._id,
       status: "processing",
     });
 
-    // Start background processing
+    // Fire-and-forget background processing
     processContentInBackground(content._id.toString(), finalLink, type).catch(
       (error) => {
         console.error("[CONTENT] Background processing failed:", error);
@@ -71,10 +67,9 @@ export const addContent = async (req: Request, res: Response) => {
     );
   } catch (error: any) {
     console.error("[CONTENT] ❌ Error adding content:", error.message);
-    res.status(500).json({
-      message: "Failed to add content",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Failed to add content", error: error.message });
   }
 };
 
@@ -85,7 +80,6 @@ export const addContent = async (req: Request, res: Response) => {
 export const getContent = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
-
     const content = await Content.find({ userId }).sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -109,9 +103,7 @@ export const getContent = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("[CONTENT] ❌ Error fetching content:", error.message);
-    res.status(500).json({
-      message: "Failed to fetch content",
-    });
+    res.status(500).json({ message: "Failed to fetch content" });
   }
 };
 
@@ -125,9 +117,7 @@ export const deleteContent = async (req: Request, res: Response) => {
     const userId = (req as any).userId;
 
     if (!contentId) {
-      return res.status(400).json({
-        message: "contentId is required",
-      });
+      return res.status(400).json({ message: "contentId is required" });
     }
 
     const deletedContent = await Content.findOneAndDelete({
@@ -136,9 +126,7 @@ export const deleteContent = async (req: Request, res: Response) => {
     });
 
     if (!deletedContent) {
-      return res.status(404).json({
-        message: "Content not found",
-      });
+      return res.status(404).json({ message: "Content not found" });
     }
 
     res.status(200).json({
@@ -147,14 +135,28 @@ export const deleteContent = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("[CONTENT] ❌ Error deleting content:", error.message);
-    res.status(500).json({
-      message: "Failed to delete content",
-    });
+    res.status(500).json({ message: "Failed to delete content" });
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BACKGROUND PIPELINE
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Background processing: Extract text and create embeddings
+ * Two-phase pipeline: EXTRACTION → EMBEDDING
+ *
+ * Extraction strategy (the key change):
+ *
+ *   type === "pdf"      → extractTextFromPdf()
+ *                         Downloads raw bytes from Cloudinary URL,
+ *                         parses the binary with pdf-parse.
+ *                         Jina AI cannot handle PDFs — this fixes that.
+ *
+ *   type === "text"     → content.extractedText already stored at save time
+ *
+ *   everything else     → extractTextFromUrl() via Jina AI Reader
+ *                         Works for articles, tweets, YouTube transcripts.
  */
 async function processContentInBackground(
   contentId: string,
@@ -166,55 +168,63 @@ async function processContentInBackground(
 
     let extractedText = "";
 
-    // ============ EXTRACTION PHASE ============
+    // ── PHASE 1: EXTRACTION ───────────────────────────────────────────────
     try {
-      console.log(`[EXTRACT] Processing ${type}...`);
+      console.log(`[EXTRACT] Processing type="${type}"...`);
 
-      // Handle text type (user provides text directly)
       if (type === "text") {
-        // For text type, extractedText is already in the field
+        // User pasted raw text; it's already saved on the document
         const content = await Content.findById(contentId);
         extractedText = (content as any).extractedText || "";
+      } else if (type === "pdf") {
+        // ← DEDICATED PDF PIPELINE
+        // Cloudinary returns an HTTPS URL to the uploaded PDF.
+        // We download the raw bytes and let pdf-parse do the work.
+        // Jina AI is NOT used here.
+        extractedText = await extractTextFromPdf(link);
       } else {
-        // For all other types (articles, tweets, YouTube, PDFs), extract from URL
+        // Articles, tweets, YouTube → Jina AI Reader
         extractedText = await extractTextFromUrl(link);
       }
 
       if (!extractedText || extractedText.trim().length < 50) {
-        throw new Error("Extracted text too short");
+        throw new Error(
+          `Extracted text too short after processing (got ${extractedText.length} chars)`,
+        );
       }
 
       await Content.findByIdAndUpdate(contentId, {
         extractedText,
         status: "extracted",
         extractedAt: new Date(),
+        extractionError: null,
       });
 
-      console.log(`[EXTRACT] ✓ Got ${extractedText.length} characters`);
+      console.log(`[EXTRACT] ✓ ${extractedText.length} chars extracted`);
     } catch (extractError: any) {
       console.error("[EXTRACT] ❌ Failed:", extractError.message);
       await Content.findByIdAndUpdate(contentId, {
         status: "failed",
         extractionError: extractError.message,
       });
-      return;
+      return; // Stop — no point embedding if extraction failed
     }
 
-    // ============ EMBEDDING PHASE ============
+    // ── PHASE 2: EMBEDDING ────────────────────────────────────────────────
     try {
       console.log("[EMBED] Creating embeddings...");
 
       const textChunks = chunkText(extractedText, 500, 50);
 
       if (textChunks.length === 0) {
-        throw new Error("Could not create chunks");
+        throw new Error("Could not create any chunks from extracted text");
       }
 
       const embeddings = await getEmbeddings(textChunks);
 
       const chunksWithEmbeddings = textChunks.map((text, index) => ({
         _id: new mongoose.Types.ObjectId(),
-        text: text,
+        text,
         chunkIndex: index,
         embedding: embeddings[index],
       }));
@@ -226,7 +236,7 @@ async function processContentInBackground(
         embeddingError: null,
       });
 
-      console.log(`[EMBED] ✓ Created ${chunksWithEmbeddings.length} chunks`);
+      console.log(`[EMBED] ✓ ${chunksWithEmbeddings.length} chunks embedded`);
     } catch (embeddingError: any) {
       console.error("[EMBED] ❌ Failed:", embeddingError.message);
       await Content.findByIdAndUpdate(contentId, {
@@ -236,7 +246,7 @@ async function processContentInBackground(
       return;
     }
 
-    console.log(`[PROCESS] ✓✓ Fully processed ${contentId} successfully!`);
+    console.log(`[PROCESS] ✓✓ Fully processed content ${contentId}`);
   } catch (error: any) {
     console.error("[PROCESS] ❌ Unexpected error:", error.message);
   }

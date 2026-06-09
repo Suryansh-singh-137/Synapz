@@ -58,9 +58,9 @@ export default function DashboardHome() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
         <QuickCard
           label="ACT_01"
-          title="+ Add Content"
-          desc="Save articles, PDFs, videos"
-          cta="Add Now"
+          title="View Content"
+          desc="Browse articles, PDFs, videos"
+          cta="View"
           href="/dashboard/content"
         />
         <QuickCard
