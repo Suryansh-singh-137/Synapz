@@ -5,13 +5,11 @@ const getToken = () => localStorage.getItem("token");
 
 export async function fetchContent() {
   const url = `${API_URL}/content`;
-  // eslint-disable-next-line no-console
   console.log("fetchContent ->", url);
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok) {
-    // eslint-disable-next-line no-console
     console.error("fetchContent failed status:", res.status);
     throw new Error("Failed to fetch content");
   }
@@ -20,7 +18,6 @@ export async function fetchContent() {
 
 export async function addContentAPI(data: any) {
   const url = `${API_URL}/content`;
-  // eslint-disable-next-line no-console
   console.log("addContent ->", url, data);
 
   const headers: Record<string, string> = {
@@ -40,7 +37,6 @@ export async function addContentAPI(data: any) {
   });
   if (!res.ok) {
     const errorText = await res.text();
-    // eslint-disable-next-line no-console
     console.error(
       "addContentAPI response status:",
       res.status,
@@ -54,7 +50,6 @@ export async function addContentAPI(data: any) {
 
 export async function deleteContentAPI(contentId: string) {
   const url = `${API_URL}/content`;
-  // eslint-disable-next-line no-console
   console.log("deleteContent ->", url, contentId);
   const res = await fetch(url, {
     method: "DELETE",
@@ -65,7 +60,6 @@ export async function deleteContentAPI(contentId: string) {
     body: JSON.stringify({ contentId }),
   });
   if (!res.ok) {
-    // eslint-disable-next-line no-console
     console.error("deleteContentAPI response status:", res.status);
     throw new Error("Failed to delete");
   }
@@ -85,11 +79,39 @@ export async function chatAPI(query: string) {
   return res.json();
 }
 
-export async function createShareLinkAPI() {
+/**
+ * GET or CREATE a share link for the current user.
+ * Returns { hash: string } — the backend handles
+ * "already exists" vs "create new" automatically.
+ */
+export async function createShareLinkAPI(): Promise<{ hash: string }> {
   const res = await fetch(`${API_URL}/brain/share`, {
     method: "POST",
+    headers: {
+      // No Content-Type needed — we send no body
+      Authorization: `Bearer ${getToken()}`,
+    },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to create share link: ${errorText}`);
+  }
+
+  return res.json(); // { hash: "abc123..." }
+}
+
+/**
+ * Delete (deactivate) the current user's share link.
+ */
+export async function deleteShareLinkAPI(): Promise<void> {
+  const res = await fetch(`${API_URL}/brain/share`, {
+    method: "DELETE",
     headers: { Authorization: `Bearer ${getToken()}` },
   });
-  if (!res.ok) throw new Error("Failed to create link");
-  return res.json();
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Failed to delete share link: ${errorText}`);
+  }
 }
