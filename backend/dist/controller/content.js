@@ -15,75 +15,81 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteContent = exports.getContent = exports.addContent = void 0;
 const Schema_1 = require("../models/Schema");
 const extractText_1 = require("../utils/extractText");
+const extractPdf_1 = require("../utils/extractPdf");
 const embeddings_1 = require("../utils/embeddings");
 const fileUpload_1 = require("../utils/fileUpload");
 const mongoose_1 = __importDefault(require("mongoose"));
-/**
- * POST /api/v1/content
- * Add new content (article, tweet, YouTube, PDF, or text)
- */
 const addContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         let { link, type, title, tags } = req.body;
         const userId = req.userId;
         console.log(`[CONTENT] Adding ${type}: ${title}`);
-        // Validate required fields
         if (!type || !title) {
-            return res.status(400).json({
-                message: "type and title are required",
-            });
+            return res.status(400).json({ message: "type and title are required" });
         }
         let finalLink = link;
-        // Handle PDF file upload
+        let preExtractedText = null;
         if (type === "pdf" && req.file) {
+            const localPath = req.file.path;
+            // ── STEP 1: Extract text from local disk FIRST ──────────────────────
+            // The file is sitting on disk right now at localPath.
+            // We read it here before uploadPdfToCloudinary() deletes it.
+            console.log(`[CONTENT] Extracting text from local file: ${localPath}`);
+            try {
+                preExtractedText = yield (0, extractPdf_1.extractTextFromLocalPdf)(localPath);
+                console.log(`[CONTENT] ✓ Extracted ${preExtractedText.length} chars from local PDF`);
+            }
+            catch (err) {
+                console.warn(`[CONTENT] ⚠ Local extraction failed: ${err.message}`);
+                // Continue anyway — we'll store status "failed" for this content
+            }
+            // ── STEP 2: Upload to Cloudinary (this deletes the local file) ───────
             console.log("[CONTENT] Uploading PDF to Cloudinary...");
-            finalLink = yield (0, fileUpload_1.uploadPdfToCloudinary)(req.file.path);
-            console.log(`[CONTENT] PDF URL: ${finalLink}`);
+            finalLink = yield (0, fileUpload_1.uploadPdfToCloudinary)(localPath);
+            console.log(`[CONTENT] PDF stored at: ${finalLink}`);
         }
-        // If type is PDF or link-based, must have link
         if ((type === "pdf" ||
             type === "article" ||
             type === "youtube" ||
             type === "tweet") &&
             !finalLink) {
-            return res.status(400).json({
-                message: `${type} requires a link`,
-            });
+            return res
+                .status(400)
+                .json({ message: `${type} requires a link or uploaded file` });
         }
-        // Create content document
+        // ── STEP 3: Save to MongoDB ───────────────────────────────────────────
+        // For PDFs: save extracted text immediately, mark "extracted"
+        // For others: save with status "pending", background job handles it
         const content = yield Schema_1.Content.create({
             link: finalLink,
             type,
             title,
             tags: tags || [],
             userId,
-            status: "pending",
+            extractedText: preExtractedText !== null && preExtractedText !== void 0 ? preExtractedText : null,
+            status: preExtractedText ? "extracted" : "pending",
+            extractedAt: preExtractedText ? new Date() : null,
+            extractionError: !preExtractedText && type === "pdf"
+                ? "Local extraction failed — PDF may be scanned/image-only"
+                : null,
             embeddingStatus: "pending",
         });
-        // Return immediately
         res.status(200).json({
-            message: "Content added successfully. Processing in background...",
+            message: "Content added. Processing in background...",
             contentId: content._id,
             status: "processing",
         });
-        // Start background processing
-        processContentInBackground(content._id.toString(), finalLink, type).catch((error) => {
-            console.error("[CONTENT] Background processing failed:", error);
-        });
+        // ── STEP 4: Background job — embed only (no extraction needed for PDFs) ─
+        processContentInBackground(content._id.toString(), finalLink, type, preExtractedText).catch((err) => console.error("[CONTENT] Background error:", err));
     }
     catch (error) {
-        console.error("[CONTENT] ❌ Error adding content:", error.message);
-        res.status(500).json({
-            message: "Failed to add content",
-            error: error.message,
-        });
+        console.error("[CONTENT] ❌", error.message);
+        res
+            .status(500)
+            .json({ message: "Failed to add content", error: error.message });
     }
 });
 exports.addContent = addContent;
-/**
- * GET /api/v1/content
- * Get all user's content
- */
 const getContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userId = req.userId;
@@ -112,100 +118,87 @@ const getContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         });
     }
     catch (error) {
-        console.error("[CONTENT] ❌ Error fetching content:", error.message);
-        res.status(500).json({
-            message: "Failed to fetch content",
-        });
+        res.status(500).json({ message: "Failed to fetch content" });
     }
 });
 exports.getContent = getContent;
-/**
- * DELETE /api/v1/content
- * Delete content by ID
- */
 const deleteContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { contentId } = req.body;
         const userId = req.userId;
         if (!contentId) {
-            return res.status(400).json({
-                message: "contentId is required",
-            });
+            return res.status(400).json({ message: "contentId is required" });
         }
-        const deletedContent = yield Schema_1.Content.findOneAndDelete({
-            _id: contentId,
-            userId: userId,
-        });
-        if (!deletedContent) {
-            return res.status(404).json({
-                message: "Content not found",
-            });
+        const deleted = yield Schema_1.Content.findOneAndDelete({ _id: contentId, userId });
+        if (!deleted) {
+            return res.status(404).json({ message: "Content not found" });
         }
-        res.status(200).json({
-            message: "Content deleted successfully",
-            deletedId: contentId,
-        });
+        res
+            .status(200)
+            .json({ message: "Deleted successfully", deletedId: contentId });
     }
     catch (error) {
-        console.error("[CONTENT] ❌ Error deleting content:", error.message);
-        res.status(500).json({
-            message: "Failed to delete content",
-        });
+        res.status(500).json({ message: "Failed to delete content" });
     }
 });
 exports.deleteContent = deleteContent;
-/**
- * Background processing: Extract text and create embeddings
- */
-function processContentInBackground(contentId, link, type) {
-    return __awaiter(this, void 0, void 0, function* () {
+// ─────────────────────────────────────────────────────────────────────────────
+function processContentInBackground(contentId_1, link_1, type_1) {
+    return __awaiter(this, arguments, void 0, function* (contentId, link, type, preExtractedText = null) {
         try {
             console.log(`[PROCESS] Starting for ${type}: ${contentId}`);
-            let extractedText = "";
-            // ============ EXTRACTION PHASE ============
-            try {
-                console.log(`[EXTRACT] Processing ${type}...`);
-                // Handle text type (user provides text directly)
-                if (type === "text") {
-                    // For text type, extractedText is already in the field
-                    const content = yield Schema_1.Content.findById(contentId);
-                    extractedText = content.extractedText || "";
-                }
-                else {
-                    // For all other types (articles, tweets, YouTube, PDFs), extract from URL
-                    extractedText = yield (0, extractText_1.extractTextFromUrl)(link);
-                }
-                if (!extractedText || extractedText.trim().length < 50) {
-                    throw new Error("Extracted text too short");
-                }
-                yield Schema_1.Content.findByIdAndUpdate(contentId, {
-                    extractedText,
-                    status: "extracted",
-                    extractedAt: new Date(),
-                });
-                console.log(`[EXTRACT] ✓ Got ${extractedText.length} characters`);
+            let extractedText = preExtractedText !== null && preExtractedText !== void 0 ? preExtractedText : "";
+            // ── EXTRACTION ────────────────────────────────────────────────────────
+            if (preExtractedText) {
+                // PDF already extracted before upload — skip this phase entirely
+                console.log(`[PROCESS] Skipping extraction — already have ${preExtractedText.length} chars`);
             }
-            catch (extractError) {
-                console.error("[EXTRACT] ❌ Failed:", extractError.message);
+            else {
+                try {
+                    if (type === "text") {
+                        const doc = yield Schema_1.Content.findById(contentId);
+                        extractedText = doc.extractedText || "";
+                    }
+                    else {
+                        // articles, tweets, youtube → Jina AI
+                        extractedText = yield (0, extractText_1.extractTextFromUrl)(link);
+                    }
+                    if (!extractedText || extractedText.trim().length < 50) {
+                        throw new Error(`Text too short: ${extractedText.length} chars`);
+                    }
+                    yield Schema_1.Content.findByIdAndUpdate(contentId, {
+                        extractedText,
+                        status: "extracted",
+                        extractedAt: new Date(),
+                        extractionError: null,
+                    });
+                    console.log(`[EXTRACT] ✓ ${extractedText.length} chars`);
+                }
+                catch (err) {
+                    console.error("[EXTRACT] ❌", err.message);
+                    yield Schema_1.Content.findByIdAndUpdate(contentId, {
+                        status: "failed",
+                        extractionError: err.message,
+                    });
+                    return;
+                }
+            }
+            if (!extractedText || extractedText.trim().length < 50) {
                 yield Schema_1.Content.findByIdAndUpdate(contentId, {
                     status: "failed",
-                    extractionError: extractError.message,
+                    extractionError: "No text to embed",
                 });
                 return;
             }
-            // ============ EMBEDDING PHASE ============
+            // ── EMBEDDING ─────────────────────────────────────────────────────────
             try {
-                console.log("[EMBED] Creating embeddings...");
-                const textChunks = (0, extractText_1.chunkText)(extractedText, 500, 50);
-                if (textChunks.length === 0) {
-                    throw new Error("Could not create chunks");
-                }
-                const embeddings = yield (0, embeddings_1.getEmbeddings)(textChunks);
-                const chunksWithEmbeddings = textChunks.map((text, index) => ({
+                const chunks = (0, extractText_1.chunkText)(extractedText, 500, 50);
+                const embeddings = yield (0, embeddings_1.getEmbeddings)(chunks);
+                const chunksWithEmbeddings = chunks.map((text, i) => ({
                     _id: new mongoose_1.default.Types.ObjectId(),
-                    text: text,
-                    chunkIndex: index,
-                    embedding: embeddings[index],
+                    text,
+                    chunkIndex: i,
+                    embedding: embeddings[i],
                 }));
                 yield Schema_1.Content.findByIdAndUpdate(contentId, {
                     chunks: chunksWithEmbeddings,
@@ -213,20 +206,19 @@ function processContentInBackground(contentId, link, type) {
                     embeddedAt: new Date(),
                     embeddingError: null,
                 });
-                console.log(`[EMBED] ✓ Created ${chunksWithEmbeddings.length} chunks`);
+                console.log(`[EMBED] ✓ ${chunksWithEmbeddings.length} chunks embedded`);
+                console.log(`[PROCESS] ✓✓ Done: ${contentId}`);
             }
-            catch (embeddingError) {
-                console.error("[EMBED] ❌ Failed:", embeddingError.message);
+            catch (err) {
+                console.error("[EMBED] ❌", err.message);
                 yield Schema_1.Content.findByIdAndUpdate(contentId, {
                     embeddingStatus: "failed",
-                    embeddingError: embeddingError.message,
+                    embeddingError: err.message,
                 });
-                return;
             }
-            console.log(`[PROCESS] ✓✓ Fully processed ${contentId} successfully!`);
         }
         catch (error) {
-            console.error("[PROCESS] ❌ Unexpected error:", error.message);
+            console.error("[PROCESS] ❌ Unexpected:", error.message);
         }
     });
 }

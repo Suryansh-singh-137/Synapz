@@ -15,7 +15,6 @@
   "dependencies": {
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/pdf-parse": "^1.1.5",
     "axios": "^1.15.0",
     "bcrypt": "^6.0.0",
     "cheerio": "^1.2.0",
@@ -29,7 +28,7 @@
     "next-cloudinary": "^6.17.5",
     "nodemon": "^3.1.14",
     "openai": "^6.34.0",
-    "pdf-parse": "^2.4.5",
+    "pdf-parse": "^1.1.1",
     "typescript": "^5.8.3",
     "zod": "^4.4.2"
   },
@@ -37,6 +36,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
     "@types/mongoose": "^5.11.96",
-    "@types/multer": "^2.1.0"
+    "@types/multer": "^2.1.0",
+    "@types/pdf-parse": "^1.1.5"
   }
 }

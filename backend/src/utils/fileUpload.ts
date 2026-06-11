@@ -70,25 +70,39 @@ const cleanUpTempFile = (filePath: string) => {
 };
 
 /**
- * Upload a PDF file path to Cloudinary and return the secure URL.
+ * Upload a PDF file path to Cloudinary and return the public download URL.
+ * Since access_mode is "public", we can use the secure_url directly.
  */
 export const uploadPdfToCloudinary = async (
   filePath: string,
-): Promise<string> => {
+): Promise<{ secureUrl: string; downloadUrl: string; publicId: string }> => {
   const fileName = path.basename(filePath);
 
   try {
     console.log("[UPLOAD] Uploading to Cloudinary:", fileName);
 
     const result = await cloudinary.uploader.upload(filePath, {
-      resource_type: "auto",
+      resource_type: "raw", // ← PDFs must be "raw"
+      access_mode: "public", // ← explicitly allow public/unauthenticated access
       folder: "second-brain/pdfs",
       public_id: fileName.replace(/\.pdf$/i, ""),
       overwrite: true,
+      format: "pdf", // ← preserve the .pdf extension in the URL
+      quality: "auto", // Optimize the PDF
     });
 
+    const publicId = result.public_id;
+    // Use the secure_url directly - it's already publicly accessible
+    const downloadUrl = result.secure_url;
+
     console.log("[UPLOAD] ✓ Upload successful:", result.secure_url);
-    return result.secure_url;
+    console.log("[UPLOAD] ✓ Public download URL:", downloadUrl);
+
+    return {
+      secureUrl: result.secure_url,
+      downloadUrl,
+      publicId,
+    };
   } catch (error: any) {
     console.error("[UPLOAD] ❌ Error:", error?.message ?? error);
     throw new Error(`Failed to upload file: ${error?.message ?? error}`);

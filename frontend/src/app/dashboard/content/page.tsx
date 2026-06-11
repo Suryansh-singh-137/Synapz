@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useContentStore } from "@/store/contentStore";
 
-const filters = ["All", "Articles", "PDFs", "Videos", "Tweets"] as const;
+const filters = ["All", "Articles", "PDFs", "Tweets"] as const;
 
 export default function ContentPage() {
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");

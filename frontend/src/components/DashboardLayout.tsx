@@ -15,8 +15,6 @@ const navItems = [
   { href: "/dashboard/chat", label: "Chat with Brain" },
 ];
 
-const settingsItems = [{ href: "/dashboard/settings", label: "Settings" }];
-
 interface Props {
   children: React.ReactNode;
 }
@@ -59,12 +57,6 @@ export function DashboardLayout({ children }: Props) {
           >
             SYNAPZ
           </Link>
-
-          <input
-            type="text"
-            placeholder="Search your brain..."
-            className="hidden md:block flex-1 max-w-md border border-ink bg-background px-4 py-2 font-mono-tech text-xs uppercase tracking-[0.15em] placeholder:text-muted-foreground focus:outline-none"
-          />
 
           <div className="flex items-center gap-3">
             <button
@@ -136,22 +128,7 @@ export function DashboardLayout({ children }: Props) {
               </div>
             </div>
 
-            <hr className="border-ink/20" />
-
             <nav className="space-y-2">
-              {settingsItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`block py-1 text-sm border-l-2 pl-3 transition-colors ${
-                    isActive(item.href)
-                      ? "border-ink text-ink"
-                      : "border-transparent text-muted-foreground hover:text-ink"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
               <button
                 onClick={handleLogout}
                 className="block w-full text-left py-1 pl-3 border-l-2 border-transparent text-sm text-muted-foreground hover:text-ink"
