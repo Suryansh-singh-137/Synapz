@@ -8,7 +8,7 @@ import { useContentStore } from "@/store/contentStore";
 
 export default function DashboardHome() {
   const { user, token, setToken } = useAuthStore();
-  const { content, loadContent } = useContentStore() as any;
+  const { content, loadContent, deleteContent } = useContentStore() as any;
   const router = useRouter();
 
   // Rehydrate token from localStorage if store is empty
@@ -40,6 +40,23 @@ export default function DashboardHome() {
     return <div className="p-8">Loading...</div>;
 
   const recent = content.slice(0, 4);
+
+  const handleViewContent = (item: any) => {
+    if (item.link) {
+      // Open the link in a new tab
+      // For PDFs on Cloudinary, this will open the PDF viewer
+      // For articles and tweets, it will open the original link
+      window.open(item.link, "_blank");
+    } else {
+      alert("No link available for this content");
+    }
+  };
+
+  const handleDeleteContent = async (itemId: string) => {
+    if (confirm("Are you sure you want to delete this item?")) {
+      await deleteContent(itemId);
+    }
+  };
 
   return (
     <main className="p-8 lg:p-12">
@@ -112,10 +129,16 @@ export default function DashboardHome() {
                   {item.tags?.join(", ") || "No tags"}
                 </p>
                 <div className="flex gap-4">
-                  <button className="font-mono-tech text-[11px] uppercase tracking-[0.2em] hover:opacity-60">
+                  <button
+                    onClick={() => handleViewContent(item)}
+                    className="font-mono-tech text-[11px] uppercase tracking-[0.2em] hover:opacity-60 text-ink"
+                  >
                     View
                   </button>
-                  <button className="font-mono-tech text-[11px] uppercase tracking-[0.2em] hover:opacity-60">
+                  <button
+                    onClick={() => handleDeleteContent(item._id)}
+                    className="font-mono-tech text-[11px] uppercase tracking-[0.2em] hover:opacity-60 text-red-600"
+                  >
                     Delete
                   </button>
                 </div>

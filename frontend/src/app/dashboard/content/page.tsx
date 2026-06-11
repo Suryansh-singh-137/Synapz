@@ -18,10 +18,17 @@ export default function ContentPage() {
     if (filter === "All") return true;
     if (filter === "Articles") return c.type === "article";
     if (filter === "PDFs") return c.type === "pdf";
-    if (filter === "Videos") return c.type === "youtube";
     if (filter === "Tweets") return c.type === "tweet";
     return true;
   });
+
+  const handleViewContent = (item: any) => {
+    if (item.link) {
+      window.open(item.link, "_blank");
+    } else {
+      alert("No link available for this content");
+    }
+  };
 
   const handleDelete = async (contentId: string) => {
     if (confirm("Delete this item?")) {
@@ -101,7 +108,10 @@ export default function ContentPage() {
                     </span>
                   </td>
                   <td className="p-4 text-sm space-x-4">
-                    <button className="font-mono-tech text-[11px] uppercase tracking-[0.2em] hover:opacity-60">
+                    <button
+                      onClick={() => handleViewContent(item)}
+                      className="font-mono-tech text-[11px] uppercase tracking-[0.2em] hover:opacity-60 text-ink"
+                    >
                       View
                     </button>
                     <button
