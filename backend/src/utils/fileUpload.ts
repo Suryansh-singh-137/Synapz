@@ -1,13 +1,9 @@
 import { v2 as cloudinary } from "cloudinary";
-
 import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { Request, Response } from "express";
 
-/**
- * CLOUDINARY SETUP
- */
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -16,19 +12,12 @@ cloudinary.config({
 
 const uploadDir = path.join(process.cwd(), "uploads");
 
-/**
- * Ensure the upload folder exists before multer writes files there.
- */
 const ensureUploadDirectory = () => {
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
 };
 
-/**
- * MULTER SETUP - For handling file uploads
- * Stores files temporarily before uploading to Cloudinary
- */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     ensureUploadDirectory();
@@ -40,7 +29,6 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req: any, file: any, cb: any) => {
-  // Only allow PDFs
   if (file.mimetype === "application/pdf") {
     cb(null, true);
   } else {
@@ -51,9 +39,7 @@ const fileFilter = (req: any, file: any, cb: any) => {
 export const upload = multer({
   storage,
   fileFilter,
-  limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
-  },
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 
 const cleanUpTempFile = (filePath: string) => {
@@ -70,50 +56,36 @@ const cleanUpTempFile = (filePath: string) => {
 };
 
 /**
- * Upload a PDF file path to Cloudinary and return the public download URL.
- * Since access_mode is "public", we can use the secure_url directly.
+ * Upload a PDF to Cloudinary.
+ * Returns a plain string URL — this is what content.ts stores as `link`.
  */
 export const uploadPdfToCloudinary = async (
   filePath: string,
-): Promise<{ secureUrl: string; downloadUrl: string; publicId: string }> => {
+): Promise<string> => {
+  // ← string, not an object
   const fileName = path.basename(filePath);
 
   try {
     console.log("[UPLOAD] Uploading to Cloudinary:", fileName);
 
     const result = await cloudinary.uploader.upload(filePath, {
-      resource_type: "raw", // ← PDFs must be "raw"
-      access_mode: "public", // ← explicitly allow public/unauthenticated access
+      resource_type: "raw",
+      access_mode: "public",
       folder: "second-brain/pdfs",
       public_id: fileName.replace(/\.pdf$/i, ""),
       overwrite: true,
-      format: "pdf", // ← preserve the .pdf extension in the URL
-      quality: "auto", // Optimize the PDF
     });
 
-    const publicId = result.public_id;
-    // Use the secure_url directly - it's already publicly accessible
-    const downloadUrl = result.secure_url;
-
     console.log("[UPLOAD] ✓ Upload successful:", result.secure_url);
-    console.log("[UPLOAD] ✓ Public download URL:", downloadUrl);
-
-    return {
-      secureUrl: result.secure_url,
-      downloadUrl,
-      publicId,
-    };
+    return result.secure_url; // ← just the string
   } catch (error: any) {
     console.error("[UPLOAD] ❌ Error:", error?.message ?? error);
     throw new Error(`Failed to upload file: ${error?.message ?? error}`);
   } finally {
-    cleanUpTempFile(filePath);
+    cleanUpTempFile(filePath); // always clean up temp file
   }
 };
 
-/**
- * Express route handler for direct PDF uploads.
- */
 export const uploadPdfFile = async (
   req: Request,
   res: Response,
@@ -121,7 +93,6 @@ export const uploadPdfFile = async (
   if (!req.file) {
     return res.status(400).json({ message: "PDF file is required" });
   }
-
   try {
     const url = await uploadPdfToCloudinary(req.file.path);
     return res.status(200).json({ url });
@@ -130,17 +101,12 @@ export const uploadPdfFile = async (
   }
 };
 
-/**
- * Delete file from Cloudinary
- */
 export const deleteFileFromCloudinary = async (
   publicId: string,
 ): Promise<void> => {
   try {
     console.log("[DELETE] Deleting from Cloudinary:", publicId);
-
     await cloudinary.uploader.destroy(`second-brain/pdfs/${publicId}`);
-
     console.log("[DELETE] ✓ Deletion successful");
   } catch (error: any) {
     console.error("[DELETE] ❌ Error:", error.message);
