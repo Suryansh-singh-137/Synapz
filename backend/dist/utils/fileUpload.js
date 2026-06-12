@@ -17,27 +17,17 @@ const cloudinary_1 = require("cloudinary");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const multer_1 = __importDefault(require("multer"));
-/**
- * CLOUDINARY SETUP
- */
 cloudinary_1.v2.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 const uploadDir = path_1.default.join(process.cwd(), "uploads");
-/**
- * Ensure the upload folder exists before multer writes files there.
- */
 const ensureUploadDirectory = () => {
     if (!fs_1.default.existsSync(uploadDir)) {
         fs_1.default.mkdirSync(uploadDir, { recursive: true });
     }
 };
-/**
- * MULTER SETUP - For handling file uploads
- * Stores files temporarily before uploading to Cloudinary
- */
 const storage = multer_1.default.diskStorage({
     destination: (req, file, cb) => {
         ensureUploadDirectory();
@@ -48,7 +38,6 @@ const storage = multer_1.default.diskStorage({
     },
 });
 const fileFilter = (req, file, cb) => {
-    // Only allow PDFs
     if (file.mimetype === "application/pdf") {
         cb(null, true);
     }
@@ -59,9 +48,7 @@ const fileFilter = (req, file, cb) => {
 exports.upload = (0, multer_1.default)({
     storage,
     fileFilter,
-    limits: {
-        fileSize: 50 * 1024 * 1024, // 50MB limit
-    },
+    limits: { fileSize: 50 * 1024 * 1024 },
 });
 const cleanUpTempFile = (filePath) => {
     try {
@@ -74,46 +61,34 @@ const cleanUpTempFile = (filePath) => {
     }
 };
 /**
- * Upload a PDF file path to Cloudinary and return the public download URL.
- * Since access_mode is "public", we can use the secure_url directly.
+ * Upload a PDF to Cloudinary.
+ * Returns a plain string URL — this is what content.ts stores as `link`.
  */
 const uploadPdfToCloudinary = (filePath) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
+    // ← string, not an object
     const fileName = path_1.default.basename(filePath);
     try {
         console.log("[UPLOAD] Uploading to Cloudinary:", fileName);
         const result = yield cloudinary_1.v2.uploader.upload(filePath, {
-            resource_type: "raw", // ← PDFs must be "raw"
-            access_mode: "public", // ← explicitly allow public/unauthenticated access
+            resource_type: "raw",
+            access_mode: "public",
             folder: "second-brain/pdfs",
             public_id: fileName.replace(/\.pdf$/i, ""),
             overwrite: true,
-            format: "pdf", // ← preserve the .pdf extension in the URL
-            quality: "auto", // Optimize the PDF
         });
-        const publicId = result.public_id;
-        // Use the secure_url directly - it's already publicly accessible
-        const downloadUrl = result.secure_url;
         console.log("[UPLOAD] ✓ Upload successful:", result.secure_url);
-        console.log("[UPLOAD] ✓ Public download URL:", downloadUrl);
-        return {
-            secureUrl: result.secure_url,
-            downloadUrl,
-            publicId,
-        };
+        return result.secure_url; // ← just the string
     }
     catch (error) {
         console.error("[UPLOAD] ❌ Error:", (_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : error);
         throw new Error(`Failed to upload file: ${(_b = error === null || error === void 0 ? void 0 : error.message) !== null && _b !== void 0 ? _b : error}`);
     }
     finally {
-        cleanUpTempFile(filePath);
+        cleanUpTempFile(filePath); // always clean up temp file
     }
 });
 exports.uploadPdfToCloudinary = uploadPdfToCloudinary;
-/**
- * Express route handler for direct PDF uploads.
- */
 const uploadPdfFile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     if (!req.file) {
@@ -128,9 +103,6 @@ const uploadPdfFile = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.uploadPdfFile = uploadPdfFile;
-/**
- * Delete file from Cloudinary
- */
 const deleteFileFromCloudinary = (publicId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log("[DELETE] Deleting from Cloudinary:", publicId);
