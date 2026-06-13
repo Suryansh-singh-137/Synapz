@@ -18,7 +18,6 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const cors_1 = __importDefault(require("cors"));
 dotenv_1.default.config();
-// ============ IMPORTS ============
 const autht_1 = require("./controller/autht");
 const content_1 = require("./controller/content");
 const authmid_1 = require("./middleware/authmid");
@@ -26,10 +25,8 @@ const generateLink_1 = require("./controller/generateLink");
 const chatController_1 = require("./controller/chatController");
 const extractController_1 = require("./controller/extractController");
 const Schema_1 = require("./models/Schema");
-// ✅ IMPORT VALIDATION AND FILE UPLOAD
 const validation_1 = require("./utils/validation");
 const fileUpload_1 = require("./utils/fileUpload");
-// ============ DATABASE ============
 const MONGO_URL = process.env.MONGO_URL;
 const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -41,13 +38,11 @@ const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 connectToDatabase();
-// ============ MIDDLEWARE ============
 app.use(express_1.default.json());
 app.use((0, cors_1.default)({
     origin: ["http://localhost:3000"],
     credentials: true,
 }));
-// ============ HEALTH CHECK ============
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
     res.json({ message: "Hello World" });
@@ -56,7 +51,6 @@ app.get("/api/v1/test", (req, res) => {
 app.post("/api/v1/signin", (0, validation_1.validateRequest)(validation_1.SigninSchema), autht_1.signin);
 app.post("/api/v1/signup", (0, validation_1.validateRequest)(validation_1.SignupSchema), autht_1.signup);
 // ============ CONTENT ROUTES ============
-// Add content (with optional file upload for PDFs)
 app.post("/api/v1/content", authmid_1.userMiddleware, fileUpload_1.upload.single("file"), // Handle single file upload
 (0, validation_1.validateRequest)(validation_1.AddContentSchema), content_1.addContent);
 app.get("/api/v1/content", authmid_1.userMiddleware, content_1.getContent);
@@ -69,6 +63,7 @@ app.post("/api/v1/brain/extract-all", authmid_1.userMiddleware, extractControlle
 app.post("/api/v1/brain/chat", authmid_1.userMiddleware, (0, validation_1.validateRequest)(validation_1.ChatSchema), chatController_1.chatWithBrain);
 app.post("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.genrateLink);
 // ============ PUBLIC ROUTES ============
+app.post("/api/v1/brain/:hash/chat", chatController_1.chatWithSharedBrain);
 app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const hash = req.params.shareLink;
     const link = yield Schema_1.Link.findOne({ hash: hash });
