@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useContentStore } from "@/store/contentStore";
+import { ShareBrainModal } from "@/components/ShareModal";
 
 export default function DashboardHome() {
   const { user, token, setToken } = useAuthStore();
   const { content, loadContent, deleteContent } = useContentStore() as any;
   const router = useRouter();
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Rehydrate token from localStorage if store is empty
   useEffect(() => {
@@ -92,9 +94,14 @@ export default function DashboardHome() {
           title="Share Brain"
           desc="Share your brain with others"
           cta="Share"
-          href="/dashboard/settings"
+          onClick={() => setIsShareModalOpen(true)}
         />
       </div>
+
+      <ShareBrainModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+      />
 
       <div className="border-t border-ink pt-8">
         <div className="flex items-end justify-between mb-6">
@@ -161,18 +168,17 @@ function QuickCard({
   desc,
   cta,
   href,
+  onClick,
 }: {
   label: string;
   title: string;
   desc: string;
   cta: string;
-  href: string;
+  href?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <Link
-      href={href}
-      className="border border-ink p-8 bg-background hover:bg-secondary transition-colors flex flex-col group"
-    >
+  const content = (
+    <>
       <div className="font-mono-tech text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-4">
         {label}
       </div>
@@ -181,6 +187,26 @@ function QuickCard({
       <div className="border border-ink bg-ink px-5 py-2.5 font-mono-tech text-[11px] uppercase tracking-[0.2em] text-ink-foreground group-hover:bg-background group-hover:text-ink w-fit">
         {cta}
       </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        onClick={onClick}
+        className="border border-ink p-8 bg-background hover:bg-secondary transition-colors flex flex-col group text-left"
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href={href || "#"}
+      className="border border-ink p-8 bg-background hover:bg-secondary transition-colors flex flex-col group"
+    >
+      {content}
     </Link>
   );
 }

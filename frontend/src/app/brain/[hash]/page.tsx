@@ -64,7 +64,6 @@ export default function SharedBrainPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -167,16 +166,7 @@ export default function SharedBrainPage() {
     : [];
 
   const filtered = brain
-    ? brain.content.filter((item) => {
-        const matchesType = filter === "all" || item.type === filter;
-        const matchesSearch =
-          searchQuery === "" ||
-          item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.tags.some((t) =>
-            t.toLowerCase().includes(searchQuery.toLowerCase()),
-          );
-        return matchesType && matchesSearch;
-      })
+    ? brain.content.filter((item) => filter === "all" || item.type === filter)
     : [];
 
   const indexedCount = brain
@@ -297,13 +287,6 @@ export default function SharedBrainPage() {
               </FilterBtn>
             ))}
           </div>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search titles or tags..."
-            className="border border-ink bg-background px-4 py-2 font-mono-tech text-xs focus:outline-none w-full sm:w-64 placeholder:text-muted-foreground"
-          />
         </div>
       </section>
 

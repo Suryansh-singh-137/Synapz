@@ -6,19 +6,21 @@ import cors from "cors";
 
 dotenv.config();
 
-// ============ IMPORTS ============
 import { signin, signup } from "./controller/autht";
 import { addContent, deleteContent, getContent } from "./controller/content";
 import { userMiddleware } from "./middleware/authmid";
 import { genrateLink } from "./controller/generateLink";
-import { chatWithBrain } from "./controller/chatController";
+import {
+  chatWithBrain,
+  chatWithSharedBrain,
+} from "./controller/chatController";
+
 import {
   extractContent,
   extractAllContent,
 } from "./controller/extractController";
 import { Content, Link, User } from "./models/Schema";
 
-// ✅ IMPORT VALIDATION AND FILE UPLOAD
 import {
   SignupSchema,
   SigninSchema,
@@ -29,7 +31,6 @@ import {
 } from "./utils/validation";
 import { upload, uploadPdfFile } from "./utils/fileUpload";
 
-// ============ DATABASE ============
 const MONGO_URL = process.env.MONGO_URL!;
 
 const connectToDatabase = async () => {
@@ -43,7 +44,6 @@ const connectToDatabase = async () => {
 
 connectToDatabase();
 
-// ============ MIDDLEWARE ============
 app.use(express.json());
 app.use(
   cors({
@@ -52,7 +52,6 @@ app.use(
   }),
 );
 
-// ============ HEALTH CHECK ============
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
   res.json({ message: "Hello World" });
@@ -63,7 +62,7 @@ app.post("/api/v1/signin", validateRequest(SigninSchema), signin);
 app.post("/api/v1/signup", validateRequest(SignupSchema), signup);
 
 // ============ CONTENT ROUTES ============
-// Add content (with optional file upload for PDFs)
+
 app.post(
   "/api/v1/content",
   userMiddleware,
@@ -103,6 +102,7 @@ app.post(
 app.post("/api/v1/brain/share", userMiddleware, genrateLink);
 
 // ============ PUBLIC ROUTES ============
+app.post("/api/v1/brain/:hash/chat", chatWithSharedBrain);
 app.get("/api/v1/brain/:shareLink", async (req, res) => {
   const hash = req.params.shareLink;
 
