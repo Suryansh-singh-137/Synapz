@@ -46,16 +46,23 @@ connectToDatabase();
 
 app.use(express.json());
 // backend/src/index.ts
-app.use(
-  cors({
-    origin: [
-      "http://localhost:3000",
-      "https://your-app.vercel.app", // add after you deploy frontend
-      process.env.FRONTEND_URL || "", // set this env var on Render
-    ].filter(Boolean),
-    credentials: true,
-  }),
-);
+
+cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      "http://localhost:3000", // local dev
+      process.env.FRONTEND_URL, // production Vercel URL
+    ].filter(Boolean);
+
+    // Allow requests with no origin (Postman, curl, server-to-server)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
+  credentials: true,
+});
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
   res.json({ message: "Hello World" });
