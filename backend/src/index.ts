@@ -45,13 +45,17 @@ const connectToDatabase = async () => {
 connectToDatabase();
 
 app.use(express.json());
+// backend/src/index.ts
 app.use(
   cors({
-    origin: ["http://localhost:3000"],
+    origin: [
+      "http://localhost:3000",
+      "https://your-app.vercel.app", // add after you deploy frontend
+      process.env.FRONTEND_URL || "", // set this env var on Render
+    ].filter(Boolean),
     credentials: true,
   }),
 );
-
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
   res.json({ message: "Hello World" });
