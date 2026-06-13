@@ -15,7 +15,7 @@ export const useContentStore = create((set, get) => ({
     try {
       const data = await fetchContent();
       set({ content: data.content || [] });
-    } catch (err) {
+    } catch (err: any) {
       // Log error for debugging
       // eslint-disable-next-line no-console
       console.error("loadContent error:", err);
@@ -26,7 +26,7 @@ export const useContentStore = create((set, get) => ({
   },
 
   // Add new content
-  addContent: async (newContent) => {
+  addContent: async (newContent: any) => {
     try {
       // eslint-disable-next-line no-console
       console.log("Adding content:", newContent);
@@ -35,7 +35,7 @@ export const useContentStore = create((set, get) => ({
       const data = await fetchContent();
       set({ content: data.content || [] });
       return true;
-    } catch (err) {
+    } catch (err: any) {
       // eslint-disable-next-line no-console
       console.error("addContent error:", err);
       set({ error: err.message || String(err) });
@@ -44,17 +44,17 @@ export const useContentStore = create((set, get) => ({
   },
 
   // Delete content
-  deleteContent: async (contentId) => {
+  deleteContent: async (contentId: any) => {
     try {
       // eslint-disable-next-line no-console
       console.log("Deleting content id:", contentId);
       await deleteContentAPI(contentId);
       // Remove from local state (don't need to reload)
-      set((state) => ({
-        content: state.content.filter((c) => c._id !== contentId),
+      set((state: any) => ({
+        content: state.content.filter((c: any) => c._id !== contentId),
       }));
       return true;
-    } catch (err) {
+    } catch (err: any) {
       // eslint-disable-next-line no-console
       console.error("deleteContent error:", err);
       set({ error: err.message || String(err) });

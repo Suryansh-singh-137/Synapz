@@ -16,9 +16,9 @@ export const useChatStore = create((set) => ({
   // ACTIONS
 
   // Send message
-  sendMessage: async (query) => {
+  sendMessage: async (query: string) => {
     // Add user message immediately
-    set((state) => ({
+    set((state: any) => ({
       messages: [...state.messages, { role: "user", content: query }],
       loading: true,
       error: "",
@@ -28,7 +28,7 @@ export const useChatStore = create((set) => ({
       const response = await chatAPI(query);
 
       // Add assistant response
-      set((state) => ({
+      set((state: any) => ({
         messages: [
           ...state.messages,
           {
@@ -40,7 +40,7 @@ export const useChatStore = create((set) => ({
       }));
 
       return true;
-    } catch (err) {
+    } catch (err: any) {
       set({ error: err.message });
       return false;
     } finally {
