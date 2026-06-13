@@ -1,4 +1,19 @@
 export const Footer = () => {
+  const socialLinks = [
+    {
+      name: "GitHub",
+      href: "https://github.com/Suryansh-singh-137?tab=repositories",
+    },
+    {
+      name: "Twitter",
+      href: "https://x.com/Confused_guy137",
+    },
+    {
+      name: "Email",
+      href: "mailto:suryanshsingh13763@gmail.com",
+    },
+  ];
+
   return (
     <footer className="bg-background">
       <div className="mx-auto max-w-[1480px] px-6 py-12">
@@ -17,13 +32,15 @@ export const Footer = () => {
           </div>
 
           <div className="flex gap-6 md:justify-end">
-            {["GitHub", "Twitter", "Email"].map((l) => (
+            {socialLinks.map((link) => (
               <a
-                key={l}
-                href="#"
+                key={link.name}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="font-mono-tech text-xs uppercase tracking-[0.2em] text-foreground transition-colors hover:text-ink"
               >
-                {l}
+                {link.name}
               </a>
             ))}
           </div>

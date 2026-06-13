@@ -9,7 +9,7 @@ dotenv.config();
 import { signin, signup } from "./controller/autht";
 import { addContent, deleteContent, getContent } from "./controller/content";
 import { userMiddleware } from "./middleware/authmid";
-import { genrateLink } from "./controller/generateLink";
+import { genrateLink, deleteLink } from "./controller/generateLink";
 import {
   chatWithBrain,
   chatWithSharedBrain,
@@ -100,9 +100,10 @@ app.post(
 );
 
 app.post("/api/v1/brain/share", userMiddleware, genrateLink);
-
+app.delete("/api/v1/brain/share", userMiddleware, deleteLink);
 // ============ PUBLIC ROUTES ============
 app.post("/api/v1/brain/:hash/chat", chatWithSharedBrain);
+
 app.get("/api/v1/brain/:shareLink", async (req, res) => {
   const hash = req.params.shareLink;
 

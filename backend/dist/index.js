@@ -62,6 +62,7 @@ app.post("/api/v1/brain/extract", authmid_1.userMiddleware, extractController_1.
 app.post("/api/v1/brain/extract-all", authmid_1.userMiddleware, extractController_1.extractAllContent);
 app.post("/api/v1/brain/chat", authmid_1.userMiddleware, (0, validation_1.validateRequest)(validation_1.ChatSchema), chatController_1.chatWithBrain);
 app.post("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.genrateLink);
+app.delete("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.deleteLink);
 // ============ PUBLIC ROUTES ============
 app.post("/api/v1/brain/:hash/chat", chatController_1.chatWithSharedBrain);
 app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
