@@ -47,14 +47,17 @@ export default function SignupForm() {
     try {
       const validated = signupSchema.parse(formData);
 
-      const response = await fetch("http://localhost:5000/api/v1/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: validated.username,
-          password: validated.password,
-        }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/signup`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: validated.username,
+            password: validated.password,
+          }),
+        },
+      );
 
       const data = await response.json();
 

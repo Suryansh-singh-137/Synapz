@@ -45,11 +45,14 @@ export default function LoginForm() {
     try {
       const validated = loginSchema.parse(formData);
 
-      const response = await fetch("http://localhost:5000/api/v1/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(validated),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/signin`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(validated),
+        },
+      );
 
       const data = await response.json();
 
