@@ -45,24 +45,33 @@ const connectToDatabase = async () => {
 connectToDatabase();
 
 app.use(express.json());
-// backend/src/index.ts
 
-cors({
-  origin: (origin, callback) => {
-    const allowedOrigins = [
-      "http://localhost:3000", // local dev
-      process.env.FRONTEND_URL, // production Vercel URL
-    ].filter(Boolean);
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://synapz-gamma.vercel.app",
+  process.env.FRONTEND_URL,
+].filter(Boolean) as string[];
 
-    // Allow requests with no origin (Postman, curl, server-to-server)
+const corsOptions = {
+  origin: (
+    origin: string | undefined,
+    callback: (err: Error | null, allow?: boolean) => void,
+  ) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error(`CORS blocked: ${origin}`));
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, false);
     }
   },
   credentials: true,
-});
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
   res.json({ message: "Hello World" });
