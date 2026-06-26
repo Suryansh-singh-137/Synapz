@@ -39,10 +39,27 @@ const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
 });
 connectToDatabase();
 app.use(express_1.default.json());
-app.use((0, cors_1.default)({
-    origin: ["http://localhost:3000"],
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://synapz-gamma.vercel.app",
+    process.env.FRONTEND_URL,
+].filter(Boolean);
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        }
+        else {
+            console.warn(`CORS blocked origin: ${origin}`);
+            callback(null, false);
+        }
+    },
     credentials: true,
-}));
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+};
+app.use((0, cors_1.default)(corsOptions));
+app.options("*", (0, cors_1.default)(corsOptions));
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
     res.json({ message: "Hello World" });

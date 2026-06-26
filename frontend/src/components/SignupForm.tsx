@@ -48,7 +48,7 @@ export default function SignupForm() {
       const validated = signupSchema.parse(formData);
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/signup`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/signup`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

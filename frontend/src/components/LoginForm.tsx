@@ -46,7 +46,7 @@ export default function LoginForm() {
       const validated = loginSchema.parse(formData);
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/signin`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/signin`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
