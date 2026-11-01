@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteLink = exports.genrateLink = void 0;
+exports.getSharedBrain = exports.deleteLink = exports.genrateLink = void 0;
 const Schema_1 = require("../models/Schema");
 const hashGenrator_1 = require("../utils/hashGenrator");
 /**
@@ -18,9 +18,6 @@ const hashGenrator_1 = require("../utils/hashGenrator");
  * Generates a shareable link for the user's brain.
  * - If a link already exists for this user → return the existing hash
  * - If no link exists → create one and return the new hash
- *
- * The frontend only needs to call this once to get/create a link.
- * No request body is needed.
  */
 const genrateLink = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -31,7 +28,6 @@ const genrateLink = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         // Check if this user already has a share link
         const existingLink = yield Schema_1.Link.findOne({ userId });
         if (existingLink) {
-            // Already has one — just return it
             return res.status(200).json({ hash: existingLink.hash });
         }
         // No existing link — create a new one
@@ -67,3 +63,52 @@ const deleteLink = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.deleteLink = deleteLink;
+/**
+ * GET /api/v1/brain/:shareLink
+ *
+ * Fetches publicly shared brain content by share hash.
+ * Strips raw vector embeddings to avoid payload bloat and data leaks.
+ */
+const getSharedBrain = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const hash = req.params.shareLink;
+        const link = yield Schema_1.Link.findOne({ hash });
+        if (!link) {
+            return res.status(404).json({ message: "Link not found" });
+        }
+        const user = yield Schema_1.User.findById(link.userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const content = yield Schema_1.Content.find({ userId: link.userId }).sort({
+            createdAt: -1,
+        });
+        return res.status(200).json({
+            username: user.username,
+            content: content.map((c) => {
+                var _a;
+                return ({
+                    _id: c._id,
+                    title: c.title,
+                    link: c.link,
+                    type: c.type,
+                    tags: c.tags,
+                    status: c.status,
+                    embeddingStatus: c.embeddingStatus,
+                    extractedAt: c.extractedAt,
+                    embeddedAt: c.embeddedAt,
+                    createdAt: c.createdAt,
+                    chunkCount: ((_a = c.chunks) === null || _a === void 0 ? void 0 : _a.length) || 0,
+                });
+            }),
+        });
+    }
+    catch (err) {
+        console.error("[SHARE] ❌ Error fetching shared brain:", err.message);
+        return res.status(500).json({
+            message: "Server error while retrieving brain",
+            error: err.message,
+        });
+    }
+});
+exports.getSharedBrain = getSharedBrain;

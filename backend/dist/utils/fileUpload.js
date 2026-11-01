@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteFileFromCloudinary = exports.uploadPdfFile = exports.uploadPdfToCloudinary = exports.upload = void 0;
+exports.deleteFileFromCloudinary = exports.uploadPdfToCloudinary = exports.upload = void 0;
 const cloudinary_1 = require("cloudinary");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -66,7 +66,6 @@ const cleanUpTempFile = (filePath) => {
  */
 const uploadPdfToCloudinary = (filePath) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
-    // ← string, not an object
     const fileName = path_1.default.basename(filePath);
     try {
         console.log("[UPLOAD] Uploading to Cloudinary:", fileName);
@@ -78,7 +77,7 @@ const uploadPdfToCloudinary = (filePath) => __awaiter(void 0, void 0, void 0, fu
             overwrite: true,
         });
         console.log("[UPLOAD] ✓ Upload successful:", result.secure_url);
-        return result.secure_url; // ← just the string
+        return result.secure_url;
     }
     catch (error) {
         console.error("[UPLOAD] ❌ Error:", (_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : error);
@@ -89,20 +88,6 @@ const uploadPdfToCloudinary = (filePath) => __awaiter(void 0, void 0, void 0, fu
     }
 });
 exports.uploadPdfToCloudinary = uploadPdfToCloudinary;
-const uploadPdfFile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    if (!req.file) {
-        return res.status(400).json({ message: "PDF file is required" });
-    }
-    try {
-        const url = yield (0, exports.uploadPdfToCloudinary)(req.file.path);
-        return res.status(200).json({ url });
-    }
-    catch (error) {
-        return res.status(500).json({ message: (_a = error === null || error === void 0 ? void 0 : error.message) !== null && _a !== void 0 ? _a : "Upload failed" });
-    }
-});
-exports.uploadPdfFile = uploadPdfFile;
 const deleteFileFromCloudinary = (publicId) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log("[DELETE] Deleting from Cloudinary:", publicId);

@@ -24,7 +24,6 @@ const authmid_1 = require("./middleware/authmid");
 const generateLink_1 = require("./controller/generateLink");
 const chatController_1 = require("./controller/chatController");
 const extractController_1 = require("./controller/extractController");
-const Schema_1 = require("./models/Schema");
 const validation_1 = require("./utils/validation");
 const fileUpload_1 = require("./utils/fileUpload");
 const MONGO_URL = process.env.MONGO_URL;
@@ -39,27 +38,10 @@ const connectToDatabase = () => __awaiter(void 0, void 0, void 0, function* () {
 });
 connectToDatabase();
 app.use(express_1.default.json());
-const allowedOrigins = [
-    "http://localhost:3000",
-    "https://synapz-gamma.vercel.app",
-    process.env.FRONTEND_URL,
-].filter(Boolean);
-const corsOptions = {
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        }
-        else {
-            console.warn(`CORS blocked origin: ${origin}`);
-            callback(null, false);
-        }
-    },
+app.use((0, cors_1.default)({
+    origin: ["http://localhost:3000", "https://synapz-gamma.vercel.app"],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-};
-app.use((0, cors_1.default)(corsOptions));
-app.options("*", (0, cors_1.default)(corsOptions));
+}));
 console.log("Registering /api/v1/test route");
 app.get("/api/v1/test", (req, res) => {
     res.json({ message: "Hello World" });
@@ -72,32 +54,16 @@ app.post("/api/v1/content", authmid_1.userMiddleware, fileUpload_1.upload.single
 (0, validation_1.validateRequest)(validation_1.AddContentSchema), content_1.addContent);
 app.get("/api/v1/content", authmid_1.userMiddleware, content_1.getContent);
 app.delete("/api/v1/content", authmid_1.userMiddleware, (0, validation_1.validateRequest)(validation_1.DeleteContentSchema), content_1.deleteContent);
-// ✅ FILE UPLOAD ENDPOINT (optional alternative)
-app.post("/api/v1/upload-pdf", authmid_1.userMiddleware, fileUpload_1.upload.single("file"), fileUpload_1.uploadPdfFile);
-// ============ BRAIN ROUTES ============
+// ============ BRAIN PROCESSING ROUTES ============
 app.post("/api/v1/brain/extract", authmid_1.userMiddleware, extractController_1.extractContent);
 app.post("/api/v1/brain/extract-all", authmid_1.userMiddleware, extractController_1.extractAllContent);
+// ============ BRAIN CHAT & SHARE ROUTES ============
 app.post("/api/v1/brain/chat", authmid_1.userMiddleware, (0, validation_1.validateRequest)(validation_1.ChatSchema), chatController_1.chatWithBrain);
 app.post("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.genrateLink);
 app.delete("/api/v1/brain/share", authmid_1.userMiddleware, generateLink_1.deleteLink);
 // ============ PUBLIC ROUTES ============
 app.post("/api/v1/brain/:hash/chat", chatController_1.chatWithSharedBrain);
-app.get("/api/v1/brain/:shareLink", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const hash = req.params.shareLink;
-    const link = yield Schema_1.Link.findOne({ hash: hash });
-    if (!link) {
-        return res.status(404).json({ message: "Link not found" });
-    }
-    const content = yield Schema_1.Content.find({ userId: link.userId });
-    const user = yield Schema_1.User.findOne({ _id: link.userId });
-    if (!user) {
-        return res.status(411).json({ message: "User not found" });
-    }
-    res.json({
-        username: user.username,
-        content: content,
-    });
-}));
+app.get("/api/v1/brain/:shareLink", generateLink_1.getSharedBrain);
 // ============ ERROR HANDLING ============
 app.use((err, req, res, next) => {
     console.error("Error:", err.message);

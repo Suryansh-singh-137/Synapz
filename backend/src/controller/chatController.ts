@@ -75,6 +75,61 @@ Answer based ONLY on the content above:`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// CORE RAG EXECUTION (Shared by private and public chats)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BrainChatResult {
+  answer: string;
+  sources: Array<{
+    title: string;
+    link: string;
+    type: string;
+    relevance: string;
+    excerpt: string;
+  }>;
+  model: string;
+}
+
+/**
+ * Core RAG pipeline: vector search -> context building -> LLM generation.
+ */
+export async function executeBrainChat(
+  userId: string,
+  query: string,
+  emptyMessage: string = "I couldn't find any relevant content in your brain about this topic. Try adding more content first!",
+): Promise<BrainChatResult> {
+  const trimmedQuery = query.trim();
+  console.log(`[CHAT] Processing query: "${trimmedQuery}" for user: ${userId}`);
+
+  // Step 1: Vector search — find the most relevant chunks from user's brain
+  const relevantChunks = await searchRelevantChunks(trimmedQuery, userId, 5);
+
+  if (relevantChunks.length === 0) {
+    return {
+      answer: emptyMessage,
+      sources: [],
+      model: MODEL,
+    };
+  }
+
+  console.log(`[CHAT] Found ${relevantChunks.length} relevant chunks`);
+
+  // Step 2: Build context and sources from retrieved chunks
+  const { context, sources } = buildContextAndSources(relevantChunks);
+
+  // Step 3: Generate answer with Groq
+  console.log("[CHAT] Calling Groq...");
+  const answer = await generateAnswer(context, trimmedQuery);
+  console.log("[CHAT] ✓ Answer generated");
+
+  return {
+    answer,
+    sources,
+    model: MODEL,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PRIVATE CHAT (authenticated — your own brain)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -94,33 +149,12 @@ export const chatWithBrain = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "query is required" });
     }
 
-    console.log(`[CHAT] Query: "${query}"`);
-
-    // Step 1: Vector search — find the most relevant chunks from THIS user's brain
-    const relevantChunks = await searchRelevantChunks(query, userId, 5);
-
-    if (relevantChunks.length === 0) {
-      return res.status(200).json({
-        answer: "I couldn't find any relevant content in your brain about this topic. Try adding more content first!",
-        sources: [],
-      });
+    if (query.trim().length > 500) {
+      return res.status(400).json({ message: "Query too long (max 500 chars)" });
     }
 
-    console.log(`[CHAT] Found ${relevantChunks.length} relevant chunks`);
-
-    // Step 2: Build context and sources from the retrieved chunks
-    const { context, sources } = buildContextAndSources(relevantChunks);
-
-    // Step 3: Generate answer with Groq
-    console.log("[CHAT] Calling Groq...");
-    const answer = await generateAnswer(context, query.trim());
-    console.log("[CHAT] ✓ Answer generated");
-
-    return res.status(200).json({
-      answer,
-      sources,
-      model: MODEL,
-    });
+    const result = await executeBrainChat(userId, query);
+    return res.status(200).json(result);
   } catch (error) {
     console.error("[CHAT] ❌ Error:", error);
     return res.status(500).json({
@@ -139,13 +173,6 @@ export const chatWithBrain = async (req: Request, res: Response) => {
  * No auth middleware — this is a public endpoint.
  *
  * Chat with SOMEONE ELSE'S brain via their share link.
- *
- * Key difference from chatWithBrain:
- * - No JWT token → no userId from middleware
- * - Instead: hash (from URL) → look up Link document → get owner's userId
- * - Then do the same vector search on THAT userId's content
- *
- * This is the same RAG flow, just with a different userId source.
  */
 export const chatWithSharedBrain = async (req: Request, res: Response) => {
   try {
@@ -160,9 +187,6 @@ export const chatWithSharedBrain = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Query too long (max 500 chars)" });
     }
 
-    // Step 1: Hash → userId
-    // The share link in the DB connects the public hash to the brain owner.
-    // This is the ONLY difference from the private chat endpoint above.
     console.log(`[SHARED CHAT] Looking up brain for hash: ${hash}`);
     const link = await Link.findOne({ hash });
 
@@ -172,37 +196,15 @@ export const chatWithSharedBrain = async (req: Request, res: Response) => {
       });
     }
 
-    const userId = link.userId;
-    console.log(`[SHARED CHAT] Found brain owner: ${userId}`);
+    console.log(`[SHARED CHAT] Found brain owner: ${link.userId}`);
 
-    // Step 2: Vector search — same function, different userId
-    const relevantChunks = await searchRelevantChunks(
-      query.trim(),
-      userId.toString(),
-      5
+    const result = await executeBrainChat(
+      link.userId.toString(),
+      query,
+      "I couldn't find any relevant content in this brain to answer your question. Try asking something related to the topics saved here.",
     );
 
-    if (relevantChunks.length === 0) {
-      return res.status(200).json({
-        answer: "I couldn't find any relevant content in this brain to answer your question. Try asking something related to the topics saved here.",
-        sources: [],
-      });
-    }
-
-    console.log(`[SHARED CHAT] Found ${relevantChunks.length} relevant chunks`);
-
-    // Step 3: Build context (same helper as private chat)
-    const { context, sources } = buildContextAndSources(relevantChunks);
-
-    // Step 4: Generate answer (same helper as private chat)
-    console.log("[SHARED CHAT] Calling Groq...");
-    const answer = await generateAnswer(context, query.trim());
-    console.log(`[SHARED CHAT] ✓ Answer generated (${answer.length} chars)`);
-
-    return res.status(200).json({
-      answer,
-      sources,
-    });
+    return res.status(200).json(result);
   } catch (error) {
     console.error("[SHARED CHAT] ❌ Error:", error);
     return res.status(500).json({

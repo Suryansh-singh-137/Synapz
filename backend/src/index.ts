@@ -9,7 +9,11 @@ dotenv.config();
 import { signin, signup } from "./controller/autht";
 import { addContent, deleteContent, getContent } from "./controller/content";
 import { userMiddleware } from "./middleware/authmid";
-import { genrateLink, deleteLink } from "./controller/generateLink";
+import {
+  genrateLink,
+  deleteLink,
+  getSharedBrain,
+} from "./controller/generateLink";
 import {
   chatWithBrain,
   chatWithSharedBrain,
@@ -19,7 +23,6 @@ import {
   extractContent,
   extractAllContent,
 } from "./controller/extractController";
-import { Content, Link, User } from "./models/Schema";
 
 import {
   SignupSchema,
@@ -29,7 +32,7 @@ import {
   DeleteContentSchema,
   validateRequest,
 } from "./utils/validation";
-import { upload, uploadPdfFile } from "./utils/fileUpload";
+import { upload } from "./utils/fileUpload";
 
 const MONGO_URL = process.env.MONGO_URL!;
 
@@ -63,7 +66,6 @@ app.post("/api/v1/signin", validateRequest(SigninSchema), signin);
 app.post("/api/v1/signup", validateRequest(SignupSchema), signup);
 
 // ============ CONTENT ROUTES ============
-
 app.post(
   "/api/v1/content",
   userMiddleware,
@@ -81,18 +83,11 @@ app.delete(
   deleteContent,
 );
 
-// ✅ FILE UPLOAD ENDPOINT (optional alternative)
-app.post(
-  "/api/v1/upload-pdf",
-  userMiddleware,
-  upload.single("file"),
-  uploadPdfFile,
-);
-
-// ============ BRAIN ROUTES ============
+// ============ BRAIN PROCESSING ROUTES ============
 app.post("/api/v1/brain/extract", userMiddleware, extractContent);
 app.post("/api/v1/brain/extract-all", userMiddleware, extractAllContent);
 
+// ============ BRAIN CHAT & SHARE ROUTES ============
 app.post(
   "/api/v1/brain/chat",
   userMiddleware,
@@ -102,30 +97,10 @@ app.post(
 
 app.post("/api/v1/brain/share", userMiddleware, genrateLink);
 app.delete("/api/v1/brain/share", userMiddleware, deleteLink);
+
 // ============ PUBLIC ROUTES ============
 app.post("/api/v1/brain/:hash/chat", chatWithSharedBrain);
-
-app.get("/api/v1/brain/:shareLink", async (req, res) => {
-  const hash = req.params.shareLink;
-
-  const link = await Link.findOne({ hash: hash });
-
-  if (!link) {
-    return res.status(404).json({ message: "Link not found" });
-  }
-
-  const content = await Content.find({ userId: link.userId });
-  const user = await User.findOne({ _id: link.userId });
-
-  if (!user) {
-    return res.status(411).json({ message: "User not found" });
-  }
-
-  res.json({
-    username: user.username,
-    content: content,
-  });
-});
+app.get("/api/v1/brain/:shareLink", getSharedBrain);
 
 // ============ ERROR HANDLING ============
 app.use((err: any, req: any, res: any, next: any) => {
@@ -137,7 +112,6 @@ app.use((err: any, req: any, res: any, next: any) => {
 });
 
 // ============ SERVER ============
-
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

@@ -24,8 +24,6 @@ export const addContent = async (req: Request, res: Response) => {
       const localPath = req.file.path;
 
       // ── STEP 1: Extract text from local disk FIRST ──────────────────────
-      // The file is sitting on disk right now at localPath.
-      // We read it here before uploadPdfToCloudinary() deletes it.
       console.log(`[CONTENT] Extracting text from local file: ${localPath}`);
       try {
         preExtractedText = await extractTextFromLocalPdf(localPath);
@@ -34,7 +32,6 @@ export const addContent = async (req: Request, res: Response) => {
         );
       } catch (err: any) {
         console.warn(`[CONTENT] ⚠ Local extraction failed: ${err.message}`);
-        // Continue anyway — we'll store status "failed" for this content
       }
 
       // ── STEP 2: Upload to Cloudinary (this deletes the local file) ───────
@@ -56,8 +53,6 @@ export const addContent = async (req: Request, res: Response) => {
     }
 
     // ── STEP 3: Save to MongoDB ───────────────────────────────────────────
-    // For PDFs: save extracted text immediately, mark "extracted"
-    // For others: save with status "pending", background job handles it
     const content = await Content.create({
       link: finalLink,
       type,
@@ -80,13 +75,13 @@ export const addContent = async (req: Request, res: Response) => {
       status: "processing",
     });
 
-    // ── STEP 4: Background job — embed only (no extraction needed for PDFs) ─
-    processContentInBackground(
+    // ── STEP 4: Ingestion Pipeline (extract if needed, chunk, and embed) ──
+    processContentPipeline(
       content._id.toString(),
       finalLink,
       type,
       preExtractedText,
-    ).catch((err) => console.error("[CONTENT] Background error:", err));
+    ).catch((err) => console.error("[CONTENT] Pipeline error:", err));
   } catch (error: any) {
     console.error("[CONTENT] ❌", error.message);
     res
@@ -148,8 +143,10 @@ export const deleteContent = async (req: Request, res: Response) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED INGESTION PIPELINE (Extraction + Chunking + Embedding)
+// ─────────────────────────────────────────────────────────────────────────────
 
-async function processContentInBackground(
+export async function processContentPipeline(
   contentId: string,
   link: string,
   type: string,
@@ -162,7 +159,6 @@ async function processContentInBackground(
 
     // ── EXTRACTION ────────────────────────────────────────────────────────
     if (preExtractedText) {
-      // PDF already extracted before upload — skip this phase entirely
       console.log(
         `[PROCESS] Skipping extraction — already have ${preExtractedText.length} chars`,
       );
@@ -170,14 +166,14 @@ async function processContentInBackground(
       try {
         if (type === "text") {
           const doc = await Content.findById(contentId);
-          extractedText = (doc as any).extractedText || "";
+          extractedText = (doc as any)?.extractedText || "";
         } else {
-          // articles, tweets, youtube → Jina AI
+          // articles, tweets, youtube → Jina AI / scraper fallback
           extractedText = await extractTextFromUrl(link);
         }
 
         if (!extractedText || extractedText.trim().length < 50) {
-          throw new Error(`Text too short: ${extractedText.length} chars`);
+          throw new Error(`Text too short: ${extractedText?.length || 0} chars`);
         }
 
         await Content.findByIdAndUpdate(contentId, {
@@ -209,7 +205,7 @@ async function processContentInBackground(
     // ── EMBEDDING ─────────────────────────────────────────────────────────
     try {
       const chunks = chunkText(extractedText, 500, 50);
-      const embeddings = await getEmbeddings(chunks);
+      const embeddings = await getEmbeddings(chunks, "search_document");
 
       const chunksWithEmbeddings = chunks.map((text, i) => ({
         _id: new mongoose.Types.ObjectId(),
@@ -238,3 +234,5 @@ async function processContentInBackground(
     console.error("[PROCESS] ❌ Unexpected:", error.message);
   }
 }
+
+export const processContentInBackground = processContentPipeline;

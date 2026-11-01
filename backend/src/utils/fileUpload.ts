@@ -2,7 +2,6 @@ import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
 import path from "path";
 import multer from "multer";
-import { Request, Response } from "express";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -62,7 +61,6 @@ const cleanUpTempFile = (filePath: string) => {
 export const uploadPdfToCloudinary = async (
   filePath: string,
 ): Promise<string> => {
-  // ← string, not an object
   const fileName = path.basename(filePath);
 
   try {
@@ -77,27 +75,12 @@ export const uploadPdfToCloudinary = async (
     });
 
     console.log("[UPLOAD] ✓ Upload successful:", result.secure_url);
-    return result.secure_url; // ← just the string
+    return result.secure_url;
   } catch (error: any) {
     console.error("[UPLOAD] ❌ Error:", error?.message ?? error);
     throw new Error(`Failed to upload file: ${error?.message ?? error}`);
   } finally {
     cleanUpTempFile(filePath); // always clean up temp file
-  }
-};
-
-export const uploadPdfFile = async (
-  req: Request,
-  res: Response,
-): Promise<Response> => {
-  if (!req.file) {
-    return res.status(400).json({ message: "PDF file is required" });
-  }
-  try {
-    const url = await uploadPdfToCloudinary(req.file.path);
-    return res.status(200).json({ url });
-  } catch (error: any) {
-    return res.status(500).json({ message: error?.message ?? "Upload failed" });
   }
 };
 

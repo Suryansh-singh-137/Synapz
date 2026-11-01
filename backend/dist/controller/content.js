@@ -12,7 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteContent = exports.getContent = exports.addContent = void 0;
+exports.processContentInBackground = exports.deleteContent = exports.getContent = exports.addContent = void 0;
+exports.processContentPipeline = processContentPipeline;
 const Schema_1 = require("../models/Schema");
 const extractText_1 = require("../utils/extractText");
 const extractPdf_1 = require("../utils/extractPdf");
@@ -32,8 +33,6 @@ const addContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (type === "pdf" && req.file) {
             const localPath = req.file.path;
             // ── STEP 1: Extract text from local disk FIRST ──────────────────────
-            // The file is sitting on disk right now at localPath.
-            // We read it here before uploadPdfToCloudinary() deletes it.
             console.log(`[CONTENT] Extracting text from local file: ${localPath}`);
             try {
                 preExtractedText = yield (0, extractPdf_1.extractTextFromLocalPdf)(localPath);
@@ -41,7 +40,6 @@ const addContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             }
             catch (err) {
                 console.warn(`[CONTENT] ⚠ Local extraction failed: ${err.message}`);
-                // Continue anyway — we'll store status "failed" for this content
             }
             // ── STEP 2: Upload to Cloudinary (this deletes the local file) ───────
             console.log("[CONTENT] Uploading PDF to Cloudinary...");
@@ -58,8 +56,6 @@ const addContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 .json({ message: `${type} requires a link or uploaded file` });
         }
         // ── STEP 3: Save to MongoDB ───────────────────────────────────────────
-        // For PDFs: save extracted text immediately, mark "extracted"
-        // For others: save with status "pending", background job handles it
         const content = yield Schema_1.Content.create({
             link: finalLink,
             type,
@@ -79,8 +75,8 @@ const addContent = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             contentId: content._id,
             status: "processing",
         });
-        // ── STEP 4: Background job — embed only (no extraction needed for PDFs) ─
-        processContentInBackground(content._id.toString(), finalLink, type, preExtractedText).catch((err) => console.error("[CONTENT] Background error:", err));
+        // ── STEP 4: Ingestion Pipeline (extract if needed, chunk, and embed) ──
+        processContentPipeline(content._id.toString(), finalLink, type, preExtractedText).catch((err) => console.error("[CONTENT] Pipeline error:", err));
     }
     catch (error) {
         console.error("[CONTENT] ❌", error.message);
@@ -143,28 +139,29 @@ const deleteContent = (req, res) => __awaiter(void 0, void 0, void 0, function* 
 });
 exports.deleteContent = deleteContent;
 // ─────────────────────────────────────────────────────────────────────────────
-function processContentInBackground(contentId_1, link_1, type_1) {
+// UNIFIED INGESTION PIPELINE (Extraction + Chunking + Embedding)
+// ─────────────────────────────────────────────────────────────────────────────
+function processContentPipeline(contentId_1, link_1, type_1) {
     return __awaiter(this, arguments, void 0, function* (contentId, link, type, preExtractedText = null) {
         try {
             console.log(`[PROCESS] Starting for ${type}: ${contentId}`);
             let extractedText = preExtractedText !== null && preExtractedText !== void 0 ? preExtractedText : "";
             // ── EXTRACTION ────────────────────────────────────────────────────────
             if (preExtractedText) {
-                // PDF already extracted before upload — skip this phase entirely
                 console.log(`[PROCESS] Skipping extraction — already have ${preExtractedText.length} chars`);
             }
             else {
                 try {
                     if (type === "text") {
                         const doc = yield Schema_1.Content.findById(contentId);
-                        extractedText = doc.extractedText || "";
+                        extractedText = (doc === null || doc === void 0 ? void 0 : doc.extractedText) || "";
                     }
                     else {
-                        // articles, tweets, youtube → Jina AI
+                        // articles, tweets, youtube → Jina AI / scraper fallback
                         extractedText = yield (0, extractText_1.extractTextFromUrl)(link);
                     }
                     if (!extractedText || extractedText.trim().length < 50) {
-                        throw new Error(`Text too short: ${extractedText.length} chars`);
+                        throw new Error(`Text too short: ${(extractedText === null || extractedText === void 0 ? void 0 : extractedText.length) || 0} chars`);
                     }
                     yield Schema_1.Content.findByIdAndUpdate(contentId, {
                         extractedText,
@@ -193,7 +190,7 @@ function processContentInBackground(contentId_1, link_1, type_1) {
             // ── EMBEDDING ─────────────────────────────────────────────────────────
             try {
                 const chunks = (0, extractText_1.chunkText)(extractedText, 500, 50);
-                const embeddings = yield (0, embeddings_1.getEmbeddings)(chunks);
+                const embeddings = yield (0, embeddings_1.getEmbeddings)(chunks, "search_document");
                 const chunksWithEmbeddings = chunks.map((text, i) => ({
                     _id: new mongoose_1.default.Types.ObjectId(),
                     text,
@@ -222,3 +219,4 @@ function processContentInBackground(contentId_1, link_1, type_1) {
         }
     });
 }
+exports.processContentInBackground = processContentPipeline;
