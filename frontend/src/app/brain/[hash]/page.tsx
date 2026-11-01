@@ -1,60 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface ContentItem {
-  _id: string;
-  title: string;
-  link: string;
-  type: "article" | "tweet" | "youtube" | "pdf" | "text";
-  tags: string[];
-  status: string;
-  embeddingStatus: string;
-  createdAt: string;
-  chunkCount: number;
-}
-
-interface SharedBrain {
-  username: string;
-  content: ContentItem[];
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  text: string;
-  sources?: Array<{ title: string; link: string; type: string }>;
-  loading?: boolean;
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const TYPE_LABELS: Record<string, string> = {
-  article: "ARTICLE",
-  tweet: "TWEET",
-  youtube: "VIDEO",
-  pdf: "PDF",
-  text: "NOTE",
-};
-
-const TYPE_ICONS: Record<string, string> = {
-  article: "◎",
-  tweet: "↗",
-  youtube: "▶",
-  pdf: "▤",
-  text: "≡",
-};
+import {
+  ContentItem,
+  SharedBrain,
+  ChatMessage,
+  TYPE_LABELS,
+  TYPE_ICONS,
+} from "@/lib/types";
+import {
+  getSharedBrainAPI,
+  chatWithSharedBrainAPI,
+} from "@/lib/apiClient";
+import { ChatMessageList } from "@/components/ChatMessageList";
 
 const SUGGESTED_QUESTIONS = [
   "What are the main topics covered here?",
   "Summarize what's in this brain",
   "What are the key insights?",
 ];
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SharedBrainPage() {
   const params = useParams();
@@ -68,31 +34,17 @@ export default function SharedBrainPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
-
-  // ── Fetch brain data ───────────────────────────────────────────────────────
+  // ── Fetch brain data via apiClient ──────────────────────────────────────────
 
   useEffect(() => {
     if (!hash) return;
     const fetchBrain = async () => {
       try {
-        const res = await fetch(`${API_URL}/brain/${hash}`);
-        if (res.status === 404) {
-          setError(
-            "This brain doesn't exist or the link has been deactivated.",
-          );
-          return;
-        }
-        if (!res.ok) {
-          setError("Failed to load this brain.");
-          return;
-        }
-        setBrain(await res.json());
-      } catch {
-        setError("Could not connect to the server.");
+        const data = await getSharedBrainAPI(hash);
+        setBrain(data);
+      } catch (err: any) {
+        setError(err.message || "Failed to load this brain.");
       } finally {
         setLoading(false);
       }
@@ -100,51 +52,33 @@ export default function SharedBrainPage() {
     fetchBrain();
   }, [hash]);
 
-  // ── Auto-scroll chat ───────────────────────────────────────────────────────
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // ── Send chat message ──────────────────────────────────────────────────────
+  // ── Send chat message via apiClient ────────────────────────────────────────
 
   const sendMessage = async (query: string) => {
     if (!query.trim() || chatLoading) return;
 
-    const userMsg: ChatMessage = { role: "user", text: query.trim() };
-    const loadingMsg: ChatMessage = {
-      role: "assistant",
-      text: "",
-      loading: true,
-    };
-
-    setMessages((prev) => [...prev, userMsg, loadingMsg]);
+    const userMsg: ChatMessage = { role: "user", content: query.trim() };
+    setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setChatLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/brain/${hash}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
-      });
-
-      const data = await res.json();
-
+      const data = await chatWithSharedBrainAPI(hash, query.trim());
       setMessages((prev) => [
-        ...prev.slice(0, -1), // remove loading bubble
+        ...prev,
         {
           role: "assistant",
-          text: data.answer ?? "Sorry, I couldn't get a response.",
+          content: data.answer ?? "Sorry, I couldn't get a response.",
           sources: data.sources ?? [],
         },
       ]);
-    } catch {
+    } catch (err: any) {
       setMessages((prev) => [
-        ...prev.slice(0, -1),
+        ...prev,
         {
           role: "assistant",
-          text: "Connection error. Please try again.",
+          content:
+            err.message || "Connection error. Please try again.",
         },
       ]);
     } finally {
@@ -356,10 +290,10 @@ export default function SharedBrainPage() {
             </div>
 
             {/* Messages area */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div className="flex-1 overflow-y-auto px-6 py-6 flex flex-col">
               {/* Empty state with suggested questions */}
               {messages.length === 0 && (
-                <div className="space-y-6">
+                <div className="space-y-6 mb-6">
                   <div className="border border-border p-4">
                     <p className="font-mono-tech text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-2">
                       HOW IT WORKS
@@ -391,76 +325,12 @@ export default function SharedBrainPage() {
                 </div>
               )}
 
-              {/* Message bubbles */}
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={msg.role === "user" ? "flex justify-end" : ""}
-                >
-                  {msg.role === "user" ? (
-                    <div className="bg-ink text-ink-foreground px-4 py-3 max-w-[85%]">
-                      <p className="text-sm">{msg.text}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 max-w-[95%]">
-                      {/* Role label */}
-                      <p className="font-mono-tech text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                        Brain AI
-                      </p>
-
-                      {/* Loading dots */}
-                      {msg.loading ? (
-                        <div className="flex gap-1 py-2">
-                          <span className="w-2 h-2 bg-ink rounded-full animate-bounce [animation-delay:0ms]" />
-                          <span className="w-2 h-2 bg-ink rounded-full animate-bounce [animation-delay:150ms]" />
-                          <span className="w-2 h-2 bg-ink rounded-full animate-bounce [animation-delay:300ms]" />
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-sm text-foreground leading-relaxed">
-                            {msg.text}
-                          </p>
-
-                          {/* Sources */}
-                          {msg.sources && msg.sources.length > 0 && (
-                            <div className="border-t border-border pt-3 space-y-1.5">
-                              <p className="font-mono-tech text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                                Sources
-                              </p>
-                              {msg.sources.map((src, si) => (
-                                <div
-                                  key={si}
-                                  className="flex items-center gap-2"
-                                >
-                                  <span className="font-mono-tech text-[10px] text-muted-foreground">
-                                    {TYPE_ICONS[src.type] ?? "◎"}
-                                  </span>
-                                  {src.link && src.type !== "text" ? (
-                                    <a
-                                      href={src.link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-ink underline hover:no-underline truncate"
-                                    >
-                                      {src.title}
-                                    </a>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground truncate">
-                                      {src.title}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              <div ref={messagesEndRef} />
+              {/* Shared Chat Message List */}
+              <ChatMessageList
+                messages={messages}
+                loading={chatLoading}
+                className="flex-1"
+              />
             </div>
 
             {/* Input */}

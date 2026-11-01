@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ZodError } from "zod";
 import { signupSchema } from "@/lib/validation";
 import { useAuthStore } from "@/store/authStore";
+import { signupAPI } from "@/lib/apiClient";
 
 type SignupFormData = {
   username: string;
@@ -46,27 +47,10 @@ export default function SignupForm() {
 
     try {
       const validated = signupSchema.parse(formData);
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/signup`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            username: validated.username,
-            password: validated.password,
-          }),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Signup failed", response.status, data);
-        setApiError(data.error || data.message || "Signup failed");
-        setLoading(false);
-        return;
-      }
+      const data = await signupAPI({
+        username: validated.username,
+        password: validated.password,
+      });
 
       if (!data.token) {
         console.error("Signup succeeded but no token returned", data);
@@ -92,7 +76,9 @@ export default function SignupForm() {
         });
         setErrors(fieldErrors);
       } else {
-        setApiError("Something went wrong");
+        setApiError(
+          error instanceof Error ? error.message : "Something went wrong",
+        );
       }
     }
   };

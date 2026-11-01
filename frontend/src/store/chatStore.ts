@@ -1,24 +1,26 @@
 import { create } from "zustand";
 import { chatAPI } from "@/lib/apiClient";
+import { ChatMessage } from "@/lib/types";
 
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  sources?: Array<{ title: string; link: string }>;
+interface ChatState {
+  messages: ChatMessage[];
+  loading: boolean;
+  error: string;
+  sendMessage: (query: string) => Promise<boolean>;
+  clearChat: () => void;
+  clearError: () => void;
 }
 
-export const useChatStore = create((set) => ({
+export const useChatStore = create<ChatState>((set) => ({
   // STATE
   messages: [],
   loading: false,
   error: "",
 
   // ACTIONS
-
-  // Send message
   sendMessage: async (query: string) => {
     // Add user message immediately
-    set((state: any) => ({
+    set((state) => ({
       messages: [...state.messages, { role: "user", content: query }],
       loading: true,
       error: "",
@@ -28,7 +30,7 @@ export const useChatStore = create((set) => ({
       const response = await chatAPI(query);
 
       // Add assistant response
-      set((state: any) => ({
+      set((state) => ({
         messages: [
           ...state.messages,
           {

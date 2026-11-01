@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ZodError } from "zod";
 import { loginSchema } from "@/lib/validation";
 import { useAuthStore } from "@/store/authStore";
+import { signinAPI } from "@/lib/apiClient";
 
 type LoginFormData = {
   username: string;
@@ -44,26 +45,7 @@ export default function LoginForm() {
 
     try {
       const validated = loginSchema.parse(formData);
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/signin`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(validated),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Login failed", response.status, data);
-        setApiError(
-          data.error || data.message || "Invalid username or password",
-        );
-        setLoading(false);
-        return;
-      }
+      const data = await signinAPI(validated);
 
       if (!data.token) {
         console.error("Login succeeded but no token returned", data);
@@ -88,7 +70,9 @@ export default function LoginForm() {
         });
         setErrors(fieldErrors);
       } else {
-        setApiError("Something went wrong");
+        setApiError(
+          error instanceof Error ? error.message : "Something went wrong",
+        );
       }
     }
   };
